@@ -17,6 +17,9 @@ data GameState = GameState Board Color deriving (Show)
 createBoard :: Loc -> Board
 createBoard ub = listArray ((1, 1), ub) $ repeat Nothing
 
+standardBoard :: Board
+standardBoard = createBoard (6, 7)
+
 showTile :: Cell -> Char
 showTile Nothing = '.'
 showTile (Just Red) = '0'
@@ -40,16 +43,19 @@ format start mid end cells =
     start ++ intercalate mid cells ++ end
 
 showBoardUnicode :: Board -> String
-showBoardUnicode b = format topRow midRow botRow $ map formatRow rows
+showBoardUnicode b = allRows ++ colHeader
     where (_, (rs, cs)) = bounds b
           rows = chunksOf cs
                . map showTileUnicode
                . elems $ b
-          topRow = format "╓" "┬" "╖\n" $ replicate cs "───"
-          midRow = format "╟" "┼" "╢\n" $ replicate cs "───"
-          botRow = format "╚" "╧" "╝\n" $ replicate cs "═══"
-          formatRow chs = format "║" "│" "║\n" $ map pad chs
+          colHeader = format "    " " " " \n" $ map pad (take cs ['a'..])
+          topRow = format "   ╓" "┬" "╖\n" $ replicate cs "───"
+          midRow = format "   ╟" "┼" "╢\n" $ replicate cs "───"
+          botRow = format "   ╚" "╧" "╝\n" $ replicate cs "═══"
+          formatRow (row, i) = format ( " " ++ show i ++ " ║") "│" "║\n" $ map pad row
           pad c = ' ' : c : " "
+          allRows = format topRow midRow botRow $ map formatRow $ zip rows [1..]
+
 main = do
-    let board = createBoard (6, 7)
+    let board = standardBoard
     putStr . showBoardUnicode $ board
