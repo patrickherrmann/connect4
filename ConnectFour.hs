@@ -3,6 +3,7 @@ import Data.List.Split (chunksOf)
 import Data.Array.IArray
 import Data.Maybe
 import Control.Monad
+import Control.Applicative
 import System.IO
 
 type Row = Int
@@ -115,19 +116,27 @@ showBoardUnicode b = allRows ++ colHeader
           allRows = format topRow midRow botRow
                   $ zipWith (curry formatRow) rows [1..]
 
+parseColumn :: Board -> String -> Maybe Int
+parseColumn _ "" = Nothing
+parseColumn b (x:_) = (+1) <$> elemIndex x (take (colCount b) ['a'..])
+
 performGameStep :: GameState -> IO ()
 performGameStep gs = do
         let (GameState b color) = gs
+        putStrLn ""
         putStr . showBoardUnicode $ b
         if gameOver gs 4
-            then putStrLn "Game over!"
+            then do
+                putStrLn "Game over!"
+                putStrLn $ (show $ opponent color) ++ " wins."
             else do
+                putStrLn $ (show color) ++ " to play:"
                 input <- getLine
-                case elemIndex (head input) (take (colCount b) ['a'..]) of
+                case parseColumn b input of
                     Nothing -> do
                         putStrLn "Unknown column"
                         performGameStep gs
-                    Just ci -> case move gs (ci + 1) of
+                    Just ci -> case move gs ci of
                         Nothing -> do
                             putStrLn "Invalid move"
                             performGameStep gs
@@ -136,4 +145,3 @@ performGameStep gs = do
 
 
 main = performGameStep startingState
-
