@@ -2,27 +2,32 @@ import Data.List
 import Data.List.Split (chunksOf)
 import Data.Array.IArray
 import Data.Maybe
+import Control.Monad
+import System.IO
 
 type Row = Int
 type Col = Int
 type Loc = (Row, Col)
 type Cell = Maybe Color
 
-data Color = Red | Black deriving (Show, Eq)
+data Color = Red | Yellow deriving (Show, Eq)
 
 type Board = Array Loc Cell
 
 data GameState = GameState Board Color deriving (Show)
 
 opponent :: Color -> Color
-opponent Red = Black
-opponent Black = Red
+opponent Red = Yellow
+opponent Yellow = Red
 
 createBoard :: Loc -> Board
 createBoard ub = listArray ((1, 1), ub) $ repeat Nothing
 
 standardBoard :: Board
 standardBoard = createBoard (6, 7)
+
+startingState :: GameState
+startingState = GameState standardBoard Yellow
 
 colCount :: Board -> Int
 colCount b = cs
@@ -65,22 +70,18 @@ move (GameState b color) c = case elem c (validMoves b) of
     False -> Nothing
     True  -> Just $ GameState (unsafeMove b c color) (opponent color)
 
-winner :: Board -> Maybe Color
-winner b = undefined
-    where checkLine l = listToMaybe
-                     . catMaybes
-                     . map groupStatus
-                     $ group l
-          groupStatus g = case head g of
-            Nothing -> Nothing
-            Just color -> if length g > 4
-                then Just color
-                else Nothing
+gameOver :: GameState -> Int -> Bool
+gameOver (GameState b color) winLength = or [hoizontal, vertical]
+    where checkLine l = any groupStatus $ group l
+          groupStatus g = isJust (head g) && length g >= winLength
+          hoizontal = any (checkLine . row b) (rows b)
+          vertical = any (checkLine . col b) (cols b)
+
 
 showTile :: Cell -> Char
 showTile Nothing = '.'
 showTile (Just Red) = '0'
-showTile (Just Black) = '#'
+showTile (Just Yellow) = '#'
 
 showBoard :: Board -> String
 showBoard b = unlines
@@ -91,8 +92,8 @@ showBoard b = unlines
 
 showTileUnicode :: Cell -> Char
 showTileUnicode Nothing = ' '
-showTileUnicode (Just Black) = '○'
-showTileUnicode (Just Red) = '●'
+showTileUnicode (Just Red) = '○'
+showTileUnicode (Just Yellow) = '●'
 
 format :: [a] -> [a] -> [a] -> [[a]] -> [a]
 format start mid end cells =
@@ -100,20 +101,40 @@ format start mid end cells =
 
 showBoardUnicode :: Board -> String
 showBoardUnicode b = allRows ++ colHeader
-    where (_, (rs, cs)) = bounds b
+    where cs = colCount b
           rows = chunksOf cs
                . map showTileUnicode
                . elems $ b
-          colHeader = format "    " " " " \n" $ map pad (take cs ['a'..])
-          topRow = format "   ╓" "┬" "╖\n" $ replicate cs "───"
-          midRow = format "   ╟" "┼" "╢\n" $ replicate cs "───"
-          botRow = format "   ╚" "╧" "╝\n" $ replicate cs "═══"
-          formatRow (row, i) = format (" " ++ show i ++ " ║") "│" "║\n"
+          colHeader = format " " " " " \n" $ map pad (take cs ['a'..])
+          topRow = format "╓" "┬" "╖\n" $ replicate cs "───"
+          midRow = format "╟" "┼" "╢\n" $ replicate cs "───"
+          botRow = format "╚" "╧" "╝\n" $ replicate cs "═══"
+          formatRow (row, i) = format "║" "│" "║\n"
                              $ map pad row
           pad c = ' ' : c : " "
           allRows = format topRow midRow botRow
                   $ zipWith (curry formatRow) rows [1..]
 
-main = do
-    let board = standardBoard
-    putStr . showBoardUnicode $ board
+performGameStep :: GameState -> IO ()
+performGameStep gs = do
+        let (GameState b color) = gs
+        putStr . showBoardUnicode $ b
+        if gameOver gs 4
+            then do
+                putStrLn "Game over!"
+            else do
+                input <- getLine
+                case elemIndex (head input) (take (colCount b) ['a'..]) of
+                    Nothing -> do
+                        putStrLn "Unknown column"
+                        performGameStep gs
+                    Just ci -> case move gs (ci + 1) of
+                        Nothing -> do
+                            putStrLn "Invalid move"
+                            performGameStep gs
+                        Just gs' -> performGameStep gs'
+
+
+
+main = performGameStep startingState
+
