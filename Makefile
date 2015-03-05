@@ -1,6 +1,6 @@
 all: connect4
 
-connect4:
+connect4: ConnectFour.hs
 	ghc ConnectFour.hs -o connect4
 
 clean:

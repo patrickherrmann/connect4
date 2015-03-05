@@ -66,12 +66,12 @@ unsafeMove b i c = setPiece b (last open) (Just c)
           sameCol (_, c) = c == i
 
 move :: GameState -> Int -> Maybe GameState
-move (GameState b color) c = case elem c (validMoves b) of
-    False -> Nothing
-    True  -> Just $ GameState (unsafeMove b c color) (opponent color)
+move (GameState b color) c = if c `elem` validMoves b
+    then Just $ GameState (unsafeMove b c color) (opponent color)
+    else Nothing
 
 gameOver :: GameState -> Int -> Bool
-gameOver (GameState b color) winLength = or [hoizontal, vertical]
+gameOver (GameState b color) winLength = hoizontal || vertical
     where checkLine l = any groupStatus $ group l
           groupStatus g = isJust (head g) && length g >= winLength
           hoizontal = any (checkLine . row b) (rows b)
@@ -120,8 +120,7 @@ performGameStep gs = do
         let (GameState b color) = gs
         putStr . showBoardUnicode $ b
         if gameOver gs 4
-            then do
-                putStrLn "Game over!"
+            then putStrLn "Game over!"
             else do
                 input <- getLine
                 case elemIndex (head input) (take (colCount b) ['a'..]) of
