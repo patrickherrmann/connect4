@@ -74,15 +74,6 @@ move (GameState b color) c = if c `elem` validMoves b
     then Just $ GameState (unsafeMove b c color) (opponent color)
     else Nothing
 
-diags :: Board -> [[Cell]]
-diags b = getCells (inds d1) ++ getCells (inds d2)
-    where d1 (r, c) = r - c
-          d2 (r, c) = r + c
-          inds d = groupBy ((==) `on` d)
-                . sortBy (comparing d)
-                $ indices b
-          getCells = map (map (b !))
-
 groups :: (Ord a, Eq a) => Board -> (Loc -> a) -> [[Cell]]
 groups b grouping = map (map (b !)) inds
     where inds = groupBy ((==) `on` grouping)
