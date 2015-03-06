@@ -2,6 +2,8 @@ import Data.List
 import Data.List.Split (chunksOf)
 import Data.Array.IArray
 import Data.Maybe
+import Data.Function
+import Data.Ord
 import Control.Monad
 import Control.Applicative
 import System.IO
@@ -63,7 +65,8 @@ setPiece b l c = b // [(l, c)]
 
 unsafeMove :: Board -> Int -> Color -> Board
 unsafeMove b i c = setPiece b (last open) (Just c)
-    where (open, _) = break (isJust . (b!)) $ filter sameCol (indices b)
+    where (open, _) = break (isJust . (b !))
+                    . filter sameCol $ indices b
           sameCol (_, c) = c == i
 
 move :: GameState -> Int -> Maybe GameState
@@ -71,12 +74,32 @@ move (GameState b color) c = if c `elem` validMoves b
     then Just $ GameState (unsafeMove b c color) (opponent color)
     else Nothing
 
+diags :: Board -> [[Cell]]
+diags b = getCells (inds d1) ++ getCells (inds d2)
+    where d1 (r, c) = r - c
+          d2 (r, c) = r + c
+          inds d = groupBy ((==) `on` d)
+                . sortBy (comparing d)
+                $ indices b
+          getCells = map (map (b !))
+
+groups :: (Ord a, Eq a) => Board -> (Loc -> a) -> [[Cell]]
+groups b grouping = map (map (b !)) inds
+    where inds = groupBy ((==) `on` grouping)
+                . sortBy (comparing grouping)
+                $ indices b
+
+vectors :: Board -> [[Cell]]
+vectors b = [diag1, diag2, vert, horiz] >>= groups b
+    where diag1 (r, c) = r - c
+          diag2 (r, c) = r + c
+          vert  (r, c) = c
+          horiz (r, c) = r
+
 gameOver :: GameState -> Int -> Bool
-gameOver (GameState b color) winLength = hoizontal || vertical
-    where checkLine l = any groupStatus $ group l
-          groupStatus g = isJust (head g) && length g >= winLength
-          hoizontal = any (checkLine . row b) (rows b)
-          vertical = any (checkLine . col b) (cols b)
+gameOver (GameState b color) winLength = any checkLine $ vectors b
+    where checkLine cells = any checkGroup $ group cells
+          checkGroup g = isJust (head g) && length g >= winLength
 
 
 showTile :: Cell -> Char
@@ -128,9 +151,9 @@ performGameStep gs = do
         if gameOver gs 4
             then do
                 putStrLn "Game over!"
-                putStrLn $ (show $ opponent color) ++ " wins."
+                putStrLn $ show (opponent color) ++ " wins."
             else do
-                putStrLn $ (show color) ++ " to play:"
+                putStrLn $ show color ++ " to play:"
                 input <- getLine
                 case parseColumn b input of
                     Nothing -> do
