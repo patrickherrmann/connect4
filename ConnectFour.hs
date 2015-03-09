@@ -14,7 +14,7 @@ module ConnectFour
 , rowCount
 , move
 , gameOver
-, showBoard
+, showBoardAscii
 , showBoardUnicode
 , columnNames
 ) where
@@ -103,8 +103,8 @@ showTile Nothing = '.'
 showTile (Just Black) = '0'
 showTile (Just White) = '#'
 
-showBoard :: Board -> String
-showBoard b = unlines
+showBoardAscii :: Board -> String
+showBoardAscii b = unlines
             . map (intersperse ' ')
             . (++ [columnNames b])
             . chunksOf (colCount b)
