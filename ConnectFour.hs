@@ -8,8 +8,6 @@ module ConnectFour
 , GameState(..)
 , opponent
 , createBoard
-, standardBoard
-, startingState
 , colCount
 , rowCount
 , move
@@ -41,14 +39,8 @@ opponent :: Color -> Color
 opponent Black = White
 opponent White = Black
 
-createBoard :: Loc -> Board
+createBoard :: (Int, Int) -> Board
 createBoard ub = listArray ((1, 1), ub) $ repeat Nothing
-
-standardBoard :: Board
-standardBoard = createBoard (6, 7)
-
-startingState :: GameState
-startingState = GameState standardBoard White
 
 colCount :: Board -> Int
 colCount b = cs

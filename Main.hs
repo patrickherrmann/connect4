@@ -3,8 +3,15 @@ import Data.List
 
 data GameConfig = GameConfig
    { winLength :: Int
-   , showBoard :: (Board -> String)
+   , rows :: Int
+   , cols :: Int
+   , startingPlayer :: Color
+   , showBoard :: Board -> String
    }
+
+initialState :: GameConfig -> GameState
+initialState config = GameState board (startingPlayer config)
+    where board = createBoard (rows config, cols config)
 
 parseColumn :: Board -> String -> Maybe Int
 parseColumn _ "" = Nothing
@@ -29,18 +36,20 @@ performGameStep gs@(GameState b color) = do
 playGame :: GameConfig -> GameState -> IO ()
 playGame config gs@(GameState b color) = do
     putStrLn ""
-    putStr . (showBoard config) $ b
+    putStr . showBoard config $ b
     if gameOver gs 4
         then do
             putStrLn "Game over!"
             putStrLn $ show (opponent color) ++ " wins."
-        else do
-            performGameStep gs >>= playGame config
+        else performGameStep gs >>= playGame config
 
 main :: IO ()
 main = do
     let config = GameConfig {
         showBoard = showBoardUnicode,
-        winLength = 4
+        winLength = 4,
+        rows = 6,
+        cols = 7,
+        startingPlayer = White
     }
-    playGame config startingState
+    playGame config (initialState config)
