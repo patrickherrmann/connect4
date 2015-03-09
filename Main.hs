@@ -76,19 +76,17 @@ playGame conf gs@(GameState b color) = do
     putStr . showBoard (textMode conf) $ b
     putStr "\n"
     if gameOver gs $ winLength conf
-        then do
-            putStrLn "Game over!"
-            putStrLn $ show (opponent color) ++ " wins."
+        then putStrLn $ show (opponent color) ++ " wins!"
         else performGameStep gs >>= playGame conf
 
 start :: GameConfig -> IO ()
-start c = playGame c startingState
-    where startingState =
-            GameState (createBoard (rows c, cols c)) White
+start c = playGame c
+        $ GameState (createBoard (rows c, cols c)) White
 
 main :: IO ()
 main = execParser opts >>= start
   where opts = info (helper <*> parseGameConfig)
-          ( fullDesc
+         $  fullDesc
          <> header "connect4 - \
-            \Play connect 4 from a command line interface" )
+                   \Play connect 4 from a command line interface"
+         <> progDesc "Change the connection length and board size"
