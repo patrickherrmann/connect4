@@ -68,11 +68,13 @@ dropPiece b i color = setPiece b (last open) (Just color)
           sameCol (_, c) = c == i
 
 unsafeMove :: GameState -> Int -> GameState
-unsafeMove (GameState b c) i = GameState (dropPiece b i c) (opponent c)
+unsafeMove (GameState b c) i =
+    GameState (dropPiece b i c) (opponent c)
 
 move :: GameState -> Int -> Maybe GameState
-move gs@(GameState b _) i | i `elem` validMoves b = Just $ unsafeMove gs i
-                              | otherwise = Nothing
+move gs@(GameState b _) i = if i `elem` validMoves b
+    then Just $ unsafeMove gs i
+    else Nothing
 
 groups :: (Ord a, Eq a) => Board -> (Loc -> a) -> [[Cell]]
 groups b grouping = map (map (b !)) inds
@@ -116,18 +118,18 @@ format start mid end cells =
 
 showBoardUnicode :: Board -> String
 showBoardUnicode b = allRows ++ colHeader
-    where cs = colCount b
-          rows = chunksOf cs
+    where cols = colCount b
+          rows = chunksOf cols
                . map showTileUnicode
                . elems $ b
-          colHeader = format " " " " " \n" $ map pad (take cs ['a'..])
-          topRow = format "╓" "┬" "╖\n" $ replicate cs "───"
-          midRow = format "╟" "┼" "╢\n" $ replicate cs "───"
-          botRow = format "╚" "╧" "╝\n" $ replicate cs "═══"
-          formatRow row = format "║" "│" "║\n"
-                             $ map pad row
-          pad c = ' ' : c : " "
+          colHeader = format " " " " " \n" . map pad $ columnNames b
+          topRow = format "╓" "┬" "╖\n" $ perCol "───"
+          midRow = format "╟" "┼" "╢\n" $ perCol "───"
+          botRow = format "╚" "╧" "╝\n" $ perCol "═══"
+          formatRow row = format "║" "│" "║\n" $ map pad row
           allRows = format topRow midRow botRow $ map formatRow rows
+          perCol = replicate cols
+          pad c = ' ' : c : " "
 
 columnNames :: Board -> String
 columnNames b = take (colCount b) ['a'..]
