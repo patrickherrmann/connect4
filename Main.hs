@@ -50,15 +50,22 @@ showBoard :: TextMode -> Board -> String
 showBoard Unicode = showBoardUnicode
 showBoard Ascii = showBoardAscii
 
+showTile :: TextMode -> Cell -> Char
+showTile Unicode = showTileUnicode
+showTile Ascii = showTileAscii
+
+showColor :: GameConfig -> Color -> Char
+showColor conf color = showTile (textMode conf) (Just color)
+
 parseColumn :: Board -> String -> Maybe Int
 parseColumn b [x] = do
     i <- elemIndex x (columnNames b)
     return $ i + 1
 parseColumn _ _ = Nothing
 
-performGameStep :: GameState -> IO GameState
-performGameStep gs@(GameState b color) = do
-    putStrLn $ show color ++ " to play:"
+performGameStep :: GameConfig -> GameState -> IO GameState
+performGameStep conf gs@(GameState b color) = do
+    putStrLn $ showColor conf color : " to play:"
     input <- getLine
     case parseColumn b input of
         Nothing -> do
@@ -76,8 +83,8 @@ playGame conf gs@(GameState b color) = do
     putStr . showBoard (textMode conf) $ b
     putStr "\n"
     if gameOver gs $ winLength conf
-        then putStrLn $ show (opponent color) ++ " wins!"
-        else performGameStep gs >>= playGame conf
+        then putStrLn $ showColor conf (opponent color) : " wins!"
+        else performGameStep conf gs >>= playGame conf
 
 start :: GameConfig -> IO ()
 start c = playGame c

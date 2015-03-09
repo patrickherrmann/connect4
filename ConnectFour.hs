@@ -13,7 +13,9 @@ module ConnectFour
 , move
 , gameOver
 , showBoardAscii
+, showTileAscii
 , showBoardUnicode
+, showTileUnicode
 , columnNames
 ) where
 
@@ -90,17 +92,17 @@ gameOver (GameState b _) streak = any checkLine $ vectors b
     where checkLine cells = any checkGroup $ group cells
           checkGroup g = isJust (head g) && length g >= streak
 
-showTile :: Cell -> Char
-showTile Nothing = '.'
-showTile (Just Black) = '0'
-showTile (Just White) = '#'
+showTileAscii :: Cell -> Char
+showTileAscii Nothing = '.'
+showTileAscii (Just Black) = '0'
+showTileAscii (Just White) = '#'
 
 showBoardAscii :: Board -> String
 showBoardAscii b = unlines
             . map (intersperse ' ')
             . (++ [columnNames b])
             . chunksOf (colCount b)
-            . map showTile
+            . map showTileAscii
             . elems $ b
 
 showTileUnicode :: Cell -> Char
