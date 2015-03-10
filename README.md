@@ -1,6 +1,15 @@
+Install dependencies and build:
 
 ```
-$ ./connect4 --help
+$ cabal sandbox init
+$ cabal install --only-dependencies
+$ cabal build
+```
+
+Run with options:
+
+```
+$ dist/build/connect4/connect4 --help
 connect4 - Play connect 4 from a command line interface
 
 Usage: connect4 [--connect N] [-r|--rows ROWS] [-c|--cols COLS] [--ascii]
@@ -13,6 +22,8 @@ Available options:
   -c,--cols COLS           The number of columns for the board
   --ascii                  Draw an ascii board instead of unicode
 ```
+
+Play the game:
 
 ```
 ...
