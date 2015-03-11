@@ -98,14 +98,13 @@ minimax streak pro d gs@(GameState b c)
           then -1000000 - d
           else 1000000 + d
 minimax _ pro 0 (GameState b c) = ([], sign pro * evalBoard b)
-minimax streak pro d gs@(GameState b c) = if pro == c
-    then maximumBy (comparing snd) kids
-    else minimumBy (comparing snd) kids
+minimax streak pro d gs@(GameState b c) = pref (comparing snd) kids
   where kids = map (result . tup) $ validMoves b
         tup col = (col, unsafeMove gs col)
         nm (col, gs') = minimax streak pro (d - 1) gs'
         result t@(col, gs') = let (path, score) = nm t in
-          (col:path, score)
+                                (col:path, score)
+        pref = if pro == c then maximumBy else minimumBy
 
 evalBoard :: Board -> Int
 evalBoard b = sum . map (evalVector . group) $ vectors b
