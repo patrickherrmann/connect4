@@ -95,8 +95,8 @@ minimax :: Int -> Color -> Int -> GameState -> ([Int], Int)
 minimax streak pro d gs@(GameState b c)
     | gameOver gs streak = ([], score)
   where score = if pro == c
-          then minBound
-          else maxBound
+          then -1000000 - d
+          else 1000000 + d
 minimax _ pro 0 (GameState b c) = ([], sign pro * evalBoard b)
 minimax streak pro d gs@(GameState b c) = if pro == c
     then maximumBy (comparing snd) kids
