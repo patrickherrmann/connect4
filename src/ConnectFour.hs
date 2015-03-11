@@ -17,6 +17,8 @@ module ConnectFour
 , showBoardUnicode
 , showTileUnicode
 , columnNames
+, evalBoard
+, minimax
 ) where
 
 import Data.List
@@ -89,15 +91,49 @@ vectors b = [diag1, diag2, vert, horiz] >>= groups b
           vert  (_, c) = c
           horiz (r, _) = r
 
+minimax :: Int -> Color -> Int -> GameState -> ([Int], Int)
+minimax streak pro d gs@(GameState b c)
+    | gameOver gs streak = ([], score)
+  where score = if pro == c
+          then minBound
+          else maxBound
+minimax _ pro 0 (GameState b c) = ([], sign pro * evalBoard b)
+minimax streak pro d gs@(GameState b c) = if pro == c
+    then maximumBy (comparing snd) kids
+    else minimumBy (comparing snd) kids
+  where kids = map (result . tup) $ validMoves b
+        tup col = (col, unsafeMove gs col)
+        nm (col, gs') = minimax streak pro (d - 1) gs'
+        result t@(col, gs') = let (path, score) = nm t in
+          (col:path, score)
+
+evalBoard :: Board -> Int
+evalBoard b = sum . map (evalVector . group) $ vectors b
+
+evalVector :: [[Cell]] -> Int
+evalVector ((Nothing:_):g@(Just c:_):cs) =
+  evalGroup g * sign c + evalVector (g:cs)
+evalVector (g@(Just c:_):n@(Nothing:_):cs) =
+  evalGroup g * sign c + evalVector (n:cs)
+evalVector (_:cs) = evalVector cs
+evalVector _ = 0
+
+evalGroup :: [Cell] -> Int
+evalGroup cs = 4 ^ (length cs - 1)
+
+sign :: Color -> Int
+sign Black = -1
+sign White = 1
+
 gameOver :: GameState -> Int -> Bool
 gameOver (GameState b _) streak = any checkLine $ vectors b
-    where checkLine cells = any checkGroup $ group cells
+    where checkLine = any checkGroup . group
           checkGroup g = isJust (head g) && length g >= streak
 
 showTileAscii :: Cell -> Char
 showTileAscii Nothing = '.'
-showTileAscii (Just Black) = '0'
-showTileAscii (Just White) = '#'
+showTileAscii (Just Black) = 'O'
+showTileAscii (Just White) = 'X'
 
 showBoardAscii :: Board -> String
 showBoardAscii b = unlines
@@ -129,7 +165,7 @@ showBoardUnicode b = allRows ++ colHeader
           formatRow row = format "║" "│" "║\n" $ map pad row
           allRows = format topRow midRow botRow $ map formatRow rows
           perCol = replicate cols
-          pad c = ' ' : c : " "
+          pad c = [' ', c, ' ']
 
 columnNames :: Board -> String
 columnNames b = take (colCount b) ['a'..]

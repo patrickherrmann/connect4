@@ -1,5 +1,6 @@
 import ConnectFour
 import Data.List
+import Data.Maybe
 import Options.Applicative
 
 data GameConfig = GameConfig
@@ -7,6 +8,7 @@ data GameConfig = GameConfig
    , rows :: Int
    , cols :: Int
    , textMode :: TextMode
+   , ai :: Int
    }
 
 data TextMode = Unicode | Ascii
@@ -39,12 +41,20 @@ parseTextMode = flag Unicode Ascii
     $  long "ascii"
     <> help "Draw an ascii board instead of unicode"
 
+parseAi :: Parser Int
+parseAi = option auto
+    $  long "ai"
+    <> metavar "DIFFICULTY"
+    <> value 4
+    <> help "How difficult to make the computer player"
+
 parseGameConfig :: Parser GameConfig
 parseGameConfig = GameConfig
     <$> parseWinLength
     <*> parseRows
     <*> parseCols
     <*> parseTextMode
+    <*> parseAi
 
 showBoard :: TextMode -> Board -> String
 showBoard Unicode = showBoardUnicode
@@ -63,8 +73,8 @@ parseColumn b [x] = do
     return $ i + 1
 parseColumn _ _ = Nothing
 
-performGameStep :: GameConfig -> GameState -> IO GameState
-performGameStep conf gs@(GameState b color) = do
+getPlayerInput :: GameConfig -> GameState -> IO GameState
+getPlayerInput conf gs@(GameState b color) = do
     putStrLn $ showColor conf color : " to play:"
     input <- getLine
     case parseColumn b input of
@@ -84,7 +94,11 @@ playGame conf gs@(GameState b color) = do
     putStr "\n"
     if gameOver gs $ winLength conf
         then putStrLn $ showColor conf (opponent color) : " wins!"
-        else performGameStep conf gs >>= playGame conf
+        else case color of
+            White -> getPlayerInput conf gs >>= playGame conf
+            Black -> do
+                let ((m:_), _) = minimax (winLength conf) color (ai conf) gs
+                playGame conf . fromJust $ move gs m
 
 start :: GameConfig -> IO ()
 start c = playGame c
