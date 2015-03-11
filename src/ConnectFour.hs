@@ -92,17 +92,17 @@ vectors b = [diag1, diag2, vert, horiz] >>= groups b
           horiz (r, _) = r
 
 minimax :: Int -> Color -> Int -> GameState -> ([Int], Int)
-minimax streak pro d gs@(GameState b c)
+minimax streak pro d gs@(GameState _ c)
     | gameOver gs streak = ([], score)
   where score = if pro == c
           then -1000000 - d
           else 1000000 + d
-minimax _ pro 0 (GameState b c) = ([], sign pro * evalBoard b)
+minimax _ pro 0 (GameState b _) = ([], sign pro * evalBoard b)
 minimax streak pro d gs@(GameState b c) = pref (comparing snd) kids
   where kids = map (result . tup) $ validMoves b
         tup col = (col, unsafeMove gs col)
-        nm (col, gs') = minimax streak pro (d - 1) gs'
-        result t@(col, gs') = let (path, score) = nm t in
+        mm (_, gs') = minimax streak pro (d - 1) gs'
+        result t@(col, _) = let (path, score) = mm t in
                                 (col:path, score)
         pref = if pro == c then maximumBy else minimumBy
 
