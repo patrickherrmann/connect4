@@ -73,13 +73,18 @@ parseColumn b [x] = case elemIndex x (columnNames b) of
 parseColumn _ _ = Left "Enter a single key to indicate \
                        \which column in which to play."
 
+tryMove :: GameConfig -> GameState -> Int -> Either String GameState
+tryMove conf gs col = case move (winLength conf) gs col of
+    Nothing -> Left "The column is full! Try again."
+    Just gs' -> Right gs'
+
 getPlayerInput :: GameConfig -> GameState -> IO GameState
 getPlayerInput conf gs@(GameState b (Undecided color)) = do
     putStrLn $ showColor conf color : " to play:"
     input <- getLine
     let result = do
             column <- parseColumn b input
-            move (winLength conf) gs column
+            tryMove conf gs column
     case result of
         Left err -> do
             putStrLn err

@@ -66,10 +66,10 @@ unsafeMove s (GameState b (Undecided c)) i = GameState b' status
           b' = dropPiece b i c
 unsafeMove _ _ _ = error "Cannot perform moves on decided boards"
 
-move :: Int -> GameState -> Int -> Either String GameState
+move :: Int -> GameState -> Int -> Maybe GameState
 move s gs@(GameState b _) i = if i `elem` validMoves b
-    then Right $ unsafeMove s gs i
-    else Left "The column is full! Try again"
+    then Just $ unsafeMove s gs i
+    else Nothing
 
 opponent :: Color -> Color
 opponent Black = White
