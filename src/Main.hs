@@ -97,7 +97,7 @@ getAiInput conf gs@(GameState _ (Undecided color)) = do
         putStrLn $ showColor conf color
             : " plays " ++ [['a'..] !! (m - 1), '!']
         return gs'
-    where (m:_, _) = minimax (winLength conf) color (ai conf) gs
+    where m = bestMove (winLength conf) color (ai conf) gs
           (Right gs') = tryMove conf gs m
 getAiInput _ _ = error "Cannot perform moves on decided boards"
 

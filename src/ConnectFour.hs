@@ -18,7 +18,7 @@ module ConnectFour
 , showBoardUnicode
 , showTileUnicode
 , columnNames
-, minimax
+, bestMove
 ) where
 
 import Data.List
@@ -43,18 +43,19 @@ data Status = Undecided Color
             | Winner Color
             | Draw deriving (Show)
 
-minimax :: Int -> Color -> Int -> GameState -> ([Int], Int)
-minimax _ _ _ (GameState _ Draw) = ([], 0)
-minimax _ pro d (GameState _ (Winner c)) = ([], score)
+bestMove :: Int -> Color -> Int -> GameState -> Int
+bestMove s pro d gs = fst $ minimax s pro d gs
+
+minimax :: Int -> Color -> Int -> GameState -> (Int, Int)
+minimax _ _ _ (GameState _ Draw) = (0, 0)
+minimax _ pro 0 (GameState b _) = (0, sign pro * evalBoard b)
+minimax _ pro d (GameState _ (Winner c)) = (0, score)
   where score = if pro == c then 100000 + d else -100000 - d
-minimax _ pro 0 (GameState b _) = ([], sign pro * evalBoard b)
-minimax streak pro d gs@(GameState b (Undecided c)) =
+minimax s pro d gs@(GameState b (Undecided c)) =
     goal (comparing snd) kids
-  where kids = map (result . tup) $ validMoves b
-        tup col = (col, unsafeMove streak gs col)
-        mm (_, gs') = minimax streak pro (d - 1) gs'
-        result t@(col, _) = let (path, score) = mm t in
-                                (col:path, score)
+  where kids = map tup $ validMoves b
+        tup i = let (_, score) = mm i in (i, score)
+        mm i = minimax s pro (d - 1) (unsafeMove s gs i)
         goal = if pro == c then maximumBy else minimumBy
 
 unsafeMove :: Int -> GameState -> Int -> GameState
