@@ -68,10 +68,10 @@ showColor conf color = showTile (textMode conf) (Just color)
 
 parseColumn :: Board -> String -> Either String Int
 parseColumn b [x] = case elemIndex x (columnNames b) of
-    Nothing -> Left "Invalid column name."
+    Nothing -> Left $ "No column '" ++ [x] ++ "'."
     Just i  -> Right $ i + 1
-parseColumn _ _ = Left "Enter a single key to indicate \
-                       \which column in which to play."
+parseColumn _ _ = Left "Enter a single key to indicate\
+                       \ the column in which to play."
 
 tryMove :: GameConfig -> GameState -> Int -> Either String GameState
 tryMove conf gs col = case move (winLength conf) gs col of
@@ -98,7 +98,7 @@ getAiInput conf gs@(GameState _ (Undecided color)) = do
             : " plays " ++ [['a'..] !! (m - 1), '!']
         return gs'
     where (m:_, _) = minimax (winLength conf) color (ai conf) gs
-          (Right gs') = move (winLength conf) gs m
+          (Right gs') = tryMove conf gs m
 getAiInput _ _ = error "Cannot perform moves on decided boards"
 
 gameStep :: GameConfig -> GameState -> IO ()
