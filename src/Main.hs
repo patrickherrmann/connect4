@@ -1,6 +1,5 @@
 import ConnectFour
 import Data.List
-import Data.Maybe
 import Options.Applicative
 
 data GameConfig = GameConfig
@@ -71,7 +70,8 @@ parseColumn :: Board -> String -> Either String Int
 parseColumn b [x] = case elemIndex x (columnNames b) of
     Nothing -> Left "Invalid column name."
     Just i  -> Right $ i + 1
-parseColumn _ _ = Left "Enter a single key to indicate which column in which to play."
+parseColumn _ _ = Left "Enter a single key to indicate \
+                       \which column in which to play."
 
 getPlayerInput :: GameConfig -> GameState -> IO GameState
 getPlayerInput conf gs@(GameState b (Undecided color)) = do
@@ -83,31 +83,33 @@ getPlayerInput conf gs@(GameState b (Undecided color)) = do
     case result of
         Left err -> do
             putStrLn err
-            return gs
+            getPlayerInput conf gs
         Right gs' -> return gs'
-
+getPlayerInput _ _ = error "Cannot perform moves on decided boards"
 
 getAiInput :: GameConfig -> GameState -> IO GameState
 getAiInput conf gs@(GameState _ (Undecided color)) = do
         putStrLn $ showColor conf color
             : " plays " ++ [['a'..] !! (m - 1), '!']
         return gs'
-    where ((m:_), _) = minimax (winLength conf) color (ai conf) gs
+    where (m:_, _) = minimax (winLength conf) color (ai conf) gs
           (Right gs') = move (winLength conf) gs m
+getAiInput _ _ = error "Cannot perform moves on decided boards"
 
-nextGameStep :: GameConfig -> GameState -> IO ()
-nextGameStep conf gs@(GameState b status) = do
+gameStep :: GameConfig -> GameState -> IO ()
+gameStep conf gs@(GameState b status) = do
     putStr $ (showBoard $ textMode conf) b
     case status of
         Draw -> putStrLn "It's a draw!"
         Winner w -> putStrLn $ showColor conf w : " wins!"
         Undecided c -> case c of
-            White -> getPlayerInput conf gs >>= nextGameStep conf
-            Black -> getAiInput conf gs >>= nextGameStep conf
+            White -> getPlayerInput conf gs >>= gameStep conf
+            Black -> getAiInput conf gs >>= gameStep conf
 
 play :: GameConfig -> IO ()
-play conf = nextGameStep conf blank
-    where blank = GameState (createBoard (rows conf, cols conf)) (Undecided White)
+play conf = gameStep conf blank
+    where blank = GameState board (Undecided White)
+          board = createBoard (rows conf, cols conf)
 
 main :: IO ()
 main = execParser opts >>= play

@@ -45,10 +45,11 @@ data Status = Undecided Color
 
 minimax :: Int -> Color -> Int -> GameState -> ([Int], Int)
 minimax _ _ _ (GameState _ Draw) = ([], 0)
-minimax streak pro d (GameState _ (Winner c)) = ([], score)
-  where score = if pro == c then 100000 - d else -100000 + d
+minimax _ pro d (GameState _ (Winner c)) = ([], score)
+  where score = if pro == c then 100000 + d else -100000 - d
 minimax _ pro 0 (GameState b _) = ([], sign pro * evalBoard b)
-minimax streak pro d gs@(GameState b (Undecided c)) = goal (comparing snd) kids
+minimax streak pro d gs@(GameState b (Undecided c)) =
+    goal (comparing snd) kids
   where kids = map (result . tup) $ validMoves b
         tup col = (col, unsafeMove streak gs col)
         mm (_, gs') = minimax streak pro (d - 1) gs'
@@ -57,16 +58,17 @@ minimax streak pro d gs@(GameState b (Undecided c)) = goal (comparing snd) kids
         goal = if pro == c then maximumBy else minimumBy
 
 unsafeMove :: Int -> GameState -> Int -> GameState
-unsafeMove streak (GameState b (Undecided c)) i = GameState b' status
+unsafeMove s (GameState b (Undecided c)) i = GameState b' status
     where status
-            | gameOver b' streak = Winner c
+            | gameOver b' s = Winner c
             | null (validMoves b') = Draw
             | otherwise = Undecided $ opponent c
           b' = dropPiece b i c
+unsafeMove _ _ _ = error "Cannot perform moves on decided boards"
 
 move :: Int -> GameState -> Int -> Either String GameState
-move streak gs@(GameState b _) i = if i `elem` validMoves b
-    then Right $ unsafeMove streak gs i
+move s gs@(GameState b _) i = if i `elem` validMoves b
+    then Right $ unsafeMove s gs i
     else Left "The column is full! Try again"
 
 opponent :: Color -> Color
