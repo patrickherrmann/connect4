@@ -6,6 +6,7 @@ module ConnectFour
 , Color(..)
 , Board
 , GameState(..)
+, Status(..)
 , opponent
 , createBoard
 , colCount
@@ -17,7 +18,6 @@ module ConnectFour
 , showBoardUnicode
 , showTileUnicode
 , columnNames
-, evalBoard
 , minimax
 ) where
 
@@ -37,7 +37,37 @@ data Color = Black | White deriving (Show, Eq)
 
 type Board = Array Loc Cell
 
-data GameState = GameState Board Color deriving (Show)
+data GameState = GameState Board Status deriving (Show)
+
+data Status = Undecided Color
+            | Winner Color
+            | Draw deriving (Show)
+
+minimax :: Int -> Color -> Int -> GameState -> ([Int], Int)
+minimax _ _ _ (GameState _ Draw) = ([], 0)
+minimax streak pro d (GameState _ (Winner c)) = ([], score)
+  where score = if pro == c then 100000 - d else -100000 + d
+minimax _ pro 0 (GameState b _) = ([], sign pro * evalBoard b)
+minimax streak pro d gs@(GameState b (Undecided c)) = goal (comparing snd) kids
+  where kids = map (result . tup) $ validMoves b
+        tup col = (col, unsafeMove streak gs col)
+        mm (_, gs') = minimax streak pro (d - 1) gs'
+        result t@(col, _) = let (path, score) = mm t in
+                                (col:path, score)
+        goal = if pro == c then maximumBy else minimumBy
+
+unsafeMove :: Int -> GameState -> Int -> GameState
+unsafeMove streak (GameState b (Undecided c)) i = GameState b' status
+    where status
+            | gameOver b' streak = Winner c
+            | null (validMoves b') = Draw
+            | otherwise = Undecided $ opponent c
+          b' = dropPiece b i c
+
+move :: Int -> GameState -> Int -> Either String GameState
+move streak gs@(GameState b _) i = if i `elem` validMoves b
+    then Right $ unsafeMove streak gs i
+    else Left "The column is full! Try again"
 
 opponent :: Color -> Color
 opponent Black = White
@@ -69,15 +99,6 @@ dropPiece b i color = setPiece b (last open) (Just color)
                     . filter sameCol $ indices b
           sameCol (_, c) = c == i
 
-unsafeMove :: GameState -> Int -> GameState
-unsafeMove (GameState b c) i =
-    GameState (dropPiece b i c) (opponent c)
-
-move :: GameState -> Int -> Maybe GameState
-move gs@(GameState b _) i = if i `elem` validMoves b
-    then Just $ unsafeMove gs i
-    else Nothing
-
 groups :: (Ord a, Eq a) => Board -> (Loc -> a) -> [[Cell]]
 groups b grouping = map (map (b !)) inds
     where inds = groupBy ((==) `on` grouping)
@@ -90,21 +111,6 @@ vectors b = [diag1, diag2, vert, horiz] >>= groups b
           diag2 (r, c) = r + c
           vert  (_, c) = c
           horiz (r, _) = r
-
-minimax :: Int -> Color -> Int -> GameState -> ([Int], Int)
-minimax streak pro d gs@(GameState _ c)
-    | gameOver gs streak = ([], score)
-  where score = if pro == c
-          then -1000000 - d
-          else 1000000 + d
-minimax _ pro 0 (GameState b _) = ([], sign pro * evalBoard b)
-minimax streak pro d gs@(GameState b c) = pref (comparing snd) kids
-  where kids = map (result . tup) $ validMoves b
-        tup col = (col, unsafeMove gs col)
-        mm (_, gs') = minimax streak pro (d - 1) gs'
-        result t@(col, _) = let (path, score) = mm t in
-                                (col:path, score)
-        pref = if pro == c then maximumBy else minimumBy
 
 evalBoard :: Board -> Int
 evalBoard b = sum . map (evalVector . group) $ vectors b
@@ -124,8 +130,8 @@ sign :: Color -> Int
 sign Black = -1
 sign White = 1
 
-gameOver :: GameState -> Int -> Bool
-gameOver (GameState b _) streak = any checkLine $ vectors b
+gameOver :: Board -> Int -> Bool
+gameOver b streak = any checkLine $ vectors b
     where checkLine = any checkGroup . group
           checkGroup g = isJust (head g) && length g >= streak
 

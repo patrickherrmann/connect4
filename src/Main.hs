@@ -67,45 +67,50 @@ showTile Ascii = showTileAscii
 showColor :: GameConfig -> Color -> Char
 showColor conf color = showTile (textMode conf) (Just color)
 
-parseColumn :: Board -> String -> Maybe Int
-parseColumn b [x] = do
-    i <- elemIndex x (columnNames b)
-    return $ i + 1
-parseColumn _ _ = Nothing
+parseColumn :: Board -> String -> Either String Int
+parseColumn b [x] = case elemIndex x (columnNames b) of
+    Nothing -> Left "Invalid column name."
+    Just i  -> Right $ i + 1
+parseColumn _ _ = Left "Enter a single key to indicate which column in which to play."
 
 getPlayerInput :: GameConfig -> GameState -> IO GameState
-getPlayerInput conf gs@(GameState b color) = do
+getPlayerInput conf gs@(GameState b (Undecided color)) = do
     putStrLn $ showColor conf color : " to play:"
     input <- getLine
-    case parseColumn b input of
-        Nothing -> do
-            putStrLn "Invalid column. Try again."
+    let result = do
+            column <- parseColumn b input
+            move (winLength conf) gs column
+    case result of
+        Left err -> do
+            putStrLn err
             return gs
-        Just ci -> case move gs ci of
-            Nothing -> do
-                putStrLn "The column is full!"
-                return gs
-            Just gs' -> return gs'
+        Right gs' -> return gs'
 
-playGame :: GameConfig -> GameState -> IO ()
-playGame conf gs@(GameState b color) = do
-    putStr "\n\n\n"
-    putStr . showBoard (textMode conf) $ b
-    putStr "\n"
-    if gameOver gs $ winLength conf
-        then putStrLn $ showColor conf (opponent color) : " wins!"
-        else case color of
-            White -> getPlayerInput conf gs >>= playGame conf
-            Black -> do
-                let ((m:_), _) = minimax (winLength conf) color (ai conf) gs
-                playGame conf . fromJust $ move gs m
 
-start :: GameConfig -> IO ()
-start c = playGame c
-        $ GameState (createBoard (rows c, cols c)) White
+getAiInput :: GameConfig -> GameState -> IO GameState
+getAiInput conf gs@(GameState _ (Undecided color)) = do
+        putStrLn $ showColor conf color
+            : " plays " ++ [['a'..] !! (m - 1), '!']
+        return gs'
+    where ((m:_), _) = minimax (winLength conf) color (ai conf) gs
+          (Right gs') = move (winLength conf) gs m
+
+nextGameStep :: GameConfig -> GameState -> IO ()
+nextGameStep conf gs@(GameState b status) = do
+    putStr $ (showBoard $ textMode conf) b
+    case status of
+        Draw -> putStrLn "It's a draw!"
+        Winner w -> putStrLn $ showColor conf w : " wins!"
+        Undecided c -> case c of
+            White -> getPlayerInput conf gs >>= nextGameStep conf
+            Black -> getAiInput conf gs >>= nextGameStep conf
+
+play :: GameConfig -> IO ()
+play conf = nextGameStep conf blank
+    where blank = GameState (createBoard (rows conf, cols conf)) (Undecided White)
 
 main :: IO ()
-main = execParser opts >>= start
+main = execParser opts >>= play
   where opts = info (helper <*> parseGameConfig)
          $  fullDesc
          <> header "connect4 - \

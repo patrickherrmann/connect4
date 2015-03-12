@@ -15,8 +15,12 @@ build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
 
+source-repository head
+    type:              git
+    location:          https://github.com/patrickherrmann/connect4.git
+
 executable connect4
-  ghc-options:         -Wall -O2
+  ghc-options:         -Wall
   main-is:             Main.hs
   build-depends:       base >=4.6,
                        split >=0.2,
