@@ -35,13 +35,20 @@ type Cell = Maybe Color
 
 type Board = Array Loc Cell
 
-data Color = Black | White deriving (Show, Eq)
+data Color
+  = Black
+  | White
+  deriving (Show, Eq)
 
-data GameState = GameState Board Status deriving (Show)
+data GameState
+  = GameState Board Status
+  deriving (Show)
 
-data Status = Undecided Color
-            | Winner Color
-            | Draw deriving (Show)
+data Status
+  = Undecided Color
+  | Winner Color
+  | Draw
+  deriving (Show)
 
 bestMove :: Int -> Color -> Int -> GameState -> Int
 bestMove s pro d gs = fst $ minimax s pro d gs
@@ -68,9 +75,9 @@ unsafeMove s (GameState b (Undecided c)) i = GameState b' status
 unsafeMove _ _ _ = error "Cannot perform moves on decided boards"
 
 move :: Int -> GameState -> Int -> Maybe GameState
-move s gs@(GameState b _) i = if i `elem` validMoves b
-  then Just $ unsafeMove s gs i
-  else Nothing
+move s gs@(GameState b _) i
+  | i `elem` validMoves b = Just $ unsafeMove s gs i
+  | otherwise = Nothing
 
 opponent :: Color -> Color
 opponent Black = White

@@ -10,7 +10,9 @@ data GameConfig = GameConfig
   , ai :: Int
   }
 
-data TextMode = Unicode | Ascii
+data TextMode
+  = Unicode
+  | Ascii
 
 parseWinLength :: Parser Int
 parseWinLength = option auto
