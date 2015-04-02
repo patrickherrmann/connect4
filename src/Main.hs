@@ -1,9 +1,13 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 import ConnectFour
 import Data.List
 import Options.Applicative
 import Control.Monad.Reader
 
-type Game = ReaderT GameConfig IO
+newtype Game a = Game
+  { runGame :: ReaderT GameConfig IO a
+  } deriving (Monad, MonadIO, MonadReader GameConfig)
 
 data GameConfig = GameConfig
   { winLength :: Int
@@ -103,7 +107,8 @@ getAiInput gs@(GameState _ (Undecided color)) = do
     conf <- ask
     let m = bestMove (winLength conf) color (ai conf) gs
     let (Right gs') = tryMove conf gs m
-    liftIO $ putStrLn $ showColor conf color : " plays " ++ [['a'..] !! (m - 1), '!']
+    let mChar = ['a'..] !! (m - 1)
+    liftIO . putStrLn $ showColor conf color : " plays " ++ [mChar, '!']
     return gs'
 getAiInput _ = error "Cannot perform moves on decided boards"
 
@@ -128,7 +133,7 @@ play = do
 main :: IO ()
 main = do
     config <- execParser opts
-    runReaderT play config
+    runReaderT (runGame play) config
   where opts = info (helper <*> parseGameConfig)
              $  fullDesc
              <> header "connect4 - \
