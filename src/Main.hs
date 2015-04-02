@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 import ConnectFour
+import CLI
 import Data.List
 import Options.Applicative
 import Control.Monad.Reader
@@ -8,61 +9,6 @@ import Control.Monad.Reader
 newtype Game a = Game
   { runGame :: ReaderT GameConfig IO a
   } deriving (Monad, MonadIO, MonadReader GameConfig)
-
-data GameConfig = GameConfig
-  { winLength :: Int
-  , rows :: Int
-  , cols :: Int
-  , textMode :: TextMode
-  , ai :: Int
-  }
-
-data TextMode
-  = Unicode
-  | Ascii
-
-parseWinLength :: Parser Int
-parseWinLength = option auto
-  $  long "connect"
-  <> metavar "N"
-  <> value 4
-  <> help "The number of pieces to connect to achieve victory"
-
-parseRows :: Parser Int
-parseRows = option auto
-  $  long "rows"
-  <> short 'r'
-  <> metavar "ROWS"
-  <> value 6
-  <> help "The number of rows for the board"
-
-parseCols :: Parser Int
-parseCols = option auto
-  $  long "cols"
-  <> short 'c'
-  <> metavar "COLS"
-  <> value 7
-  <> help "The number of columns for the board"
-
-parseTextMode :: Parser TextMode
-parseTextMode = flag Unicode Ascii
-  $  long "ascii"
-  <> help "Draw an ascii board instead of unicode"
-
-parseDifficulty :: Parser Int
-parseDifficulty = option auto
-  $  long "ai"
-  <> metavar "DIFFICULTY"
-  <> value 4
-  <> help "How difficult to make the computer player"
-
-parseGameConfig :: Parser GameConfig
-parseGameConfig = GameConfig
-  <$> parseWinLength
-  <*> parseRows
-  <*> parseCols
-  <*> parseTextMode
-  <*> parseDifficulty
 
 showBoard :: TextMode -> Board -> String
 showBoard Unicode = showBoardUnicode
@@ -90,11 +36,10 @@ tryMove conf gs col = case move (winLength conf) gs col of
 getPlayerInput :: GameState -> Game GameState
 getPlayerInput gs@(GameState b (Undecided color)) = do
   conf <- ask
-  liftIO . putStrLn $ showColor conf color : " to play:"
-  input <- liftIO $ getLine
-  let result = do
-        column <- parseColumn b input
-        tryMove conf gs column
+  input <- liftIO $ do
+    putStrLn $ showColor conf color : " to play:"
+    getLine
+  let result = parseColumn b input >>= tryMove conf gs
   case result of
     Left err -> do
       liftIO $ putStrLn err
@@ -123,17 +68,15 @@ gameStep gs@(GameState b status) = do
       White -> getPlayerInput gs >>= gameStep
       Black -> getAiInput gs >>= gameStep
 
-play :: Game ()
-play = do
+start :: Game ()
+start = do
   conf <- ask
   let board = createBoard (rows conf, cols conf)
   let blank = GameState board (Undecided White)
   gameStep blank
 
 main :: IO ()
-main = do
-    config <- execParser opts
-    runReaderT (runGame play) config
+main = execParser opts >>= runReaderT (runGame start)
   where opts = info (helper <*> parseGameConfig)
              $  fullDesc
              <> header "connect4 - \
