@@ -1,6 +1,9 @@
 import ConnectFour
 import Data.List
 import Options.Applicative
+import Control.Monad.Reader
+
+type Game = ReaderT GameConfig IO
 
 data GameConfig = GameConfig
   { winLength :: Int
@@ -80,45 +83,52 @@ tryMove conf gs col = case move (winLength conf) gs col of
   Nothing -> Left "The column is full! Try again."
   Just gs' -> Right gs'
 
-getPlayerInput :: GameConfig -> GameState -> IO GameState
-getPlayerInput conf gs@(GameState b (Undecided color)) = do
-  putStrLn $ showColor conf color : " to play:"
-  input <- getLine
+getPlayerInput :: GameState -> Game GameState
+getPlayerInput gs@(GameState b (Undecided color)) = do
+  conf <- ask
+  liftIO . putStrLn $ showColor conf color : " to play:"
+  input <- liftIO $ getLine
   let result = do
         column <- parseColumn b input
         tryMove conf gs column
   case result of
     Left err -> do
-      putStrLn err
-      getPlayerInput conf gs
+      liftIO $ putStrLn err
+      getPlayerInput gs
     Right gs' -> return gs'
-getPlayerInput _ _ = error "Cannot perform moves on decided boards"
+getPlayerInput _ = error "Cannot perform moves on decided boards"
 
-getAiInput :: GameConfig -> GameState -> IO GameState
-getAiInput conf gs@(GameState _ (Undecided color)) = do
-    putStrLn $ showColor conf color : " plays " ++ [['a'..] !! (m - 1), '!']
+getAiInput :: GameState -> Game GameState
+getAiInput gs@(GameState _ (Undecided color)) = do
+    conf <- ask
+    let m = bestMove (winLength conf) color (ai conf) gs
+    let (Right gs') = tryMove conf gs m
+    liftIO $ putStrLn $ showColor conf color : " plays " ++ [['a'..] !! (m - 1), '!']
     return gs'
-  where m = bestMove (winLength conf) color (ai conf) gs
-        (Right gs') = tryMove conf gs m
-getAiInput _ _ = error "Cannot perform moves on decided boards"
+getAiInput _ = error "Cannot perform moves on decided boards"
 
-gameStep :: GameConfig -> GameState -> IO ()
-gameStep conf gs@(GameState b status) = do
-  putStr $ (showBoard $ textMode conf) b
+gameStep :: GameState -> Game ()
+gameStep gs@(GameState b status) = do
+  conf <- ask
+  liftIO . putStr $ (showBoard $ textMode conf) b
   case status of
-    Draw -> putStrLn "It's a draw!"
-    Winner w -> putStrLn $ showColor conf w : " wins!"
+    Draw -> liftIO $ putStrLn "It's a draw!"
+    Winner w -> liftIO $ putStrLn $ showColor conf w : " wins!"
     Undecided c -> case c of
-      White -> getPlayerInput conf gs >>= gameStep conf
-      Black -> getAiInput conf gs >>= gameStep conf
+      White -> getPlayerInput gs >>= gameStep
+      Black -> getAiInput gs >>= gameStep
 
-play :: GameConfig -> IO ()
-play conf = gameStep conf blank
-  where blank = GameState board (Undecided White)
-        board = createBoard (rows conf, cols conf)
+play :: Game ()
+play = do
+  conf <- ask
+  let board = createBoard (rows conf, cols conf)
+  let blank = GameState board (Undecided White)
+  gameStep blank
 
 main :: IO ()
-main = execParser opts >>= play
+main = do
+    config <- execParser opts
+    runReaderT play config
   where opts = info (helper <*> parseGameConfig)
              $  fullDesc
              <> header "connect4 - \
