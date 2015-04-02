@@ -6,7 +6,7 @@ import Data.List
 import Options.Applicative
 import Control.Monad.Reader
 
-newtype Game a = Game
+newtype GameIO a = GameIO
   { runGame :: ReaderT GameConfig IO a
   } deriving (Monad, MonadIO, MonadReader GameConfig)
 
@@ -33,7 +33,7 @@ tryMove conf gs col = case move (winLength conf) gs col of
   Nothing -> Left "The column is full! Try again."
   Just gs' -> Right gs'
 
-getPlayerInput :: GameState -> Game GameState
+getPlayerInput :: GameState -> GameIO GameState
 getPlayerInput gs@(GameState b (Undecided color)) = do
   conf <- ask
   input <- liftIO $ do
@@ -47,7 +47,7 @@ getPlayerInput gs@(GameState b (Undecided color)) = do
     Right gs' -> return gs'
 getPlayerInput _ = error "Cannot perform moves on decided boards"
 
-getAiInput :: GameState -> Game GameState
+getAiInput :: GameState -> GameIO GameState
 getAiInput gs@(GameState _ (Undecided color)) = do
     conf <- ask
     let m = bestMove (winLength conf) color (ai conf) gs
@@ -57,7 +57,7 @@ getAiInput gs@(GameState _ (Undecided color)) = do
     return gs'
 getAiInput _ = error "Cannot perform moves on decided boards"
 
-gameStep :: GameState -> Game ()
+gameStep :: GameState -> GameIO ()
 gameStep gs@(GameState b status) = do
   conf <- ask
   liftIO . putStr $ (showBoard $ textMode conf) b
@@ -68,7 +68,7 @@ gameStep gs@(GameState b status) = do
       White -> getPlayerInput gs >>= gameStep
       Black -> getAiInput gs >>= gameStep
 
-start :: Game ()
+start :: GameIO ()
 start = do
   conf <- ask
   let board = createBoard (rows conf, cols conf)
