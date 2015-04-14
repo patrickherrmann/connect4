@@ -1,4 +1,4 @@
-Install dependencies and build:
+Build with cabal:
 
 ```
 $ cabal sandbox init
@@ -42,7 +42,7 @@ Play against the computer:
 ╟───┼───┼───┼───┼───┼───┼───╢
 ║ ● │ ○ │ ● │ ● │ ● │ ○ │   ║
 ╚═══╧═══╧═══╧═══╧═══╧═══╧═══╝
-  a   b   c   d   e   f   g  
+  a   b   c   d   e   f   g
 
 ○ wins!
 
