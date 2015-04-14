@@ -2,6 +2,7 @@ module CLI
 ( GameConfig(..)
 , TextMode(..)
 , parseGameConfig
+, optParser
 ) where
 
 import Options.Applicative
@@ -60,3 +61,9 @@ parseGameConfig = GameConfig
   <*> parseCols
   <*> parseTextMode
   <*> parseDifficulty
+
+optParser = info (helper <*> parseGameConfig)
+             $  fullDesc
+             <> header "connect4 - \
+                       \Play connect 4 from a command line interface"
+             <> progDesc "Change the connection length and board size"
