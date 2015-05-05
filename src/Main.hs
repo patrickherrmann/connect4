@@ -8,7 +8,13 @@ import Control.Monad.Reader
 
 newtype GameIO a = GameIO
   { runGame :: ReaderT GameConfig IO a
-  } deriving (Monad, MonadIO, MonadReader GameConfig)
+  } deriving
+  ( Functor
+  , Applicative
+  , Monad
+  , MonadIO
+  , MonadReader GameConfig
+  )
 
 showBoard :: TextMode -> Board -> String
 showBoard Unicode = showBoardUnicode

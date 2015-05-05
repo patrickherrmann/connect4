@@ -62,6 +62,7 @@ parseGameConfig = GameConfig
   <*> parseTextMode
   <*> parseDifficulty
 
+optParser :: ParserInfo GameConfig
 optParser = info (helper <*> parseGameConfig)
              $  fullDesc
              <> header "connect4 - \
