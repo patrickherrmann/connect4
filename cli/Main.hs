@@ -2,7 +2,7 @@
 
 import ConnectFour
 import CLI
-import ComputerPlayer
+import ConnectFour.ComputerPlayer
 import qualified Data.Map as M
 
 main :: IO ()

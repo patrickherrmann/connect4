@@ -1,4 +1,6 @@
-module ComputerPlayer where
+module ConnectFour.ComputerPlayer
+  (computerPlayer
+  ) where
 
 import ConnectFour
 import Data.Maybe
