@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module ConnectFour
 ( Row
 , Col
@@ -6,13 +8,12 @@ module ConnectFour
 , Board
 , Color(..)
 , GameState(..)
-, Status(..)
+, GameOutcome(..)
+, Move(..)
+, MoveInfraction(..)
+, PlayerIO(..)
+, GameIO(..)
 , opponent
-, createBoard
-, colCount
-, rowCount
-, move
-, gameOver
 , bestMove
 ) where
 
@@ -21,30 +22,81 @@ import Data.Array.IArray
 import Data.Maybe
 import Data.Function
 import Data.Ord
+import qualified Data.Map as M
+import Control.Monad.Reader
 
-type Row = Int
-type Col = Int
+newtype Row = Row Int deriving (Eq, Ord, Enum, Ix)
+newtype Col = Col Int deriving (Eq, Ord, Enum, Ix)
 type Loc = (Row, Col)
 type Cell = Maybe Color
+
+data Move = Move Row Col
 
 type Board = Array Loc Cell
 
 data Color
   = Black
   | White
-  deriving (Show, Eq)
+  deriving (Eq)
 
-data GameState
-  = GameState Board Status
-  deriving (Show)
+data GameState = GameState
+  { board :: Board
+  , toPlay :: Color
+  }
 
-data Status
-  = Undecided Color
+data GameOutcome
+  = Draw
   | Winner Color
-  | Draw
-  deriving (Show)
+
+data MoveInfraction
+  = ColumnFull Col
+
+data PlayerIO = PlayerIO
+  { showGameState :: GameState -> IO ()
+  , showMoveInfraction :: MoveInfraction -> IO ()
+  , showGameOutcode :: GameOutcome -> IO ()
+  , chooseMove :: GameState -> IO Move
+  }
+
+type PMap a = M.Map Color a
+
+data GameIO = GameIO
+  { playerIO     :: PMap PlayerIO
+  , winLength    :: Int
+  , boardWidth   :: Col
+  , boardHeight  :: Row
+  }
+
+newtype ConnectFourIO a = ConnectFourIO
+  { runGame :: ReaderT GameIO IO a
+  } deriving
+  ( Functor
+  , Applicative
+  , Monad
+  , MonadReader GameIO
+  , MonadIO
+  )
+
+playGame :: GameIO -> IO ()
+playGame gio = runGameWith gio entireGame
+
+runGameWith :: GameIO -> ConnectFourIO a -> IO a
+runGameWith gio = flip runReaderT gio . runGame
+
+entireGame :: ConnectFourIO ()
+entireGame = do
+  return ()
+
+initialGameState :: ConnectFourIO GameState
+initialGameState = do
+  bw <- asks boardWidth
+  bh <- asks boardHeight
+  let b = createBoard (bh, bw)
+  return $ GameState b White
 
 bestMove :: Int -> Color -> Int -> GameState -> Int
+bestMove = undefined
+{-
 bestMove s pro d gs = fst $ minimax s pro d gs
 
 minimax :: Int -> Color -> Int -> GameState -> (Int, Int)
@@ -58,17 +110,12 @@ minimax s pro d gs@(GameState b (Undecided c)) =
         tup i = let (_, score) = mm i in (i, score)
         mm i = minimax s pro (d - 1) (unsafeMove s gs i)
         goal = if pro == c then maximumBy else minimumBy
+-}
+unsafeMove :: Int -> GameState -> Col -> GameState
+unsafeMove s (GameState b c) i = GameState b' (opponent c)
+  where b' = dropPiece b i c
 
-unsafeMove :: Int -> GameState -> Int -> GameState
-unsafeMove s (GameState b (Undecided c)) i = GameState b' status
-  where status
-          | gameOver b' s = Winner c
-          | null (validMoves b') = Draw
-          | otherwise = Undecided $ opponent c
-        b' = dropPiece b i c
-unsafeMove _ _ _ = error "Cannot perform moves on decided boards"
-
-move :: Int -> GameState -> Int -> Maybe GameState
+move :: Int -> GameState -> Col -> Maybe GameState
 move s gs@(GameState b _) i
   | i `elem` validMoves b = Just $ unsafeMove s gs i
   | otherwise = Nothing
@@ -77,27 +124,20 @@ opponent :: Color -> Color
 opponent Black = White
 opponent White = Black
 
-createBoard :: (Int, Int) -> Board
-createBoard ub = listArray ((1, 1), ub) $ repeat Nothing
+createBoard :: (Row, Col) -> Board
+createBoard ub = listArray ((Row 1, Col 1), ub) $ repeat Nothing
 
-colCount :: Board -> Int
-colCount b = cs
-  where (_, (_, cs)) = bounds b
+columnFull :: Board -> Col -> Bool
+columnFull b c = isJust (b ! (Row 1, c))
 
-rowCount :: Board -> Int
-rowCount b = rs
-  where (_, (rs, _)) = bounds b
-
-columnFull :: Board -> Int -> Bool
-columnFull b c = isJust (b ! (1, c))
-
-validMoves :: Board -> [Int]
-validMoves b = filter (not . columnFull b) [1..colCount b]
+validMoves :: Board -> [Col]
+validMoves b = filter (not . columnFull b) [(Col 1)..cc]
+  where (_, (_, cc)) = bounds b
 
 setPiece :: Board -> Loc -> Cell -> Board
 setPiece b l c = b // [(l, c)]
 
-dropPiece :: Board -> Int -> Color -> Board
+dropPiece :: Board -> Col -> Color -> Board
 dropPiece b i color = setPiece b (last open) (Just color)
   where (open, _) = break (isJust . (b !))
                   . filter sameCol $ indices b
@@ -134,7 +174,11 @@ sign :: Color -> Int
 sign Black = -1
 sign White = 1
 
-gameOver :: Board -> Int -> Bool
-gameOver b streak = any checkLine $ vectors b
+gameOver :: GameState -> Int -> Maybe GameOutcome
+gameOver gs streak
+    | any checkLine $ vectors b = Just $ Winner (opponent $ toPlay gs)
+    | null $ validMoves b = Just Draw
+    | otherwise = Nothing
   where checkLine = any checkGroup . group
         checkGroup g = isJust (head g) && length g >= streak
+        b = board gs
