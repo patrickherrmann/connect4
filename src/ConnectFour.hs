@@ -15,6 +15,7 @@ module ConnectFour
 , GameIO(..)
 , opponent
 , playGame
+, bestMove
 ) where
 
 import Data.List
@@ -53,7 +54,7 @@ data MoveInfraction
 data PlayerIO = PlayerIO
   { showGameState :: GameState -> IO ()
   , showMoveInfraction :: MoveInfraction -> IO ()
-  , showGameOutcode :: GameOutcome -> IO ()
+  , showGameOutcome :: GameOutcome -> IO ()
   , chooseMove :: GameState -> IO Col
   }
 
@@ -85,8 +86,9 @@ runGameWith gio = flip runReaderT gio . runGame
 entireGame :: ConnectFourIO ()
 entireGame = do
   gs <- initialGameState
+  doEachPlayerIO_ showGameState gs
   outcome <- playTurns gs
-  doEachPlayerIO_ showGameOutcode (const outcome)
+  doEachPlayerIO_ showGameOutcome outcome
   return ()
 
 playTurns :: GameState -> ConnectFourIO GameOutcome
@@ -102,7 +104,10 @@ playTurn gs = do
   chosenCol <- doPlayerIO p chooseMove gs
   case checkMove gs chosenCol of
     Just mi -> doPlayerIO p showMoveInfraction mi >> playTurn gs
-    Nothing -> return $ unsafeMove gs chosenCol
+    Nothing -> do
+      let gs' = unsafeMove gs chosenCol
+      doEachPlayerIO_ showGameState gs'
+      return gs'
 
 initialGameState :: ConnectFourIO GameState
 initialGameState = do
@@ -166,11 +171,33 @@ doPlayerIO p f a = do
   pio <- (M.! p) <$> asks playerIO
   liftIO $ f pio a
 
-doEachPlayerIO_ :: (PlayerIO -> a -> IO b) -> (Player -> a) -> ConnectFourIO ()
-doEachPlayerIO_ f fa = do
+doEachPlayerIO_ :: (PlayerIO -> a -> IO b) -> a -> ConnectFourIO ()
+doEachPlayerIO_ f a = do
   pios <- M.assocs <$> asks playerIO
-  let res (p, pio) = f pio (fa p)
+  let res (_, pio) = f pio a
   liftIO $ mapM_ res pios
+
+bestMove :: Int -> Int -> GameState -> Maybe Col
+bestMove n d gs = fst $ minimax n d gs
+
+minimax :: Int -> Int -> GameState -> (Maybe Col, Int)
+minimax n d (gameOutcome' n -> Just go) = (Nothing, scoreGameOutcome d go)
+minimax _ 0 (board -> b) = (Nothing, evalBoard b)
+minimax n d gs = bestBy (toPlay gs) (comparing snd) (edges n (d - 1) gs)
+  where bestBy White = maximumBy
+        bestBy Black = minimumBy
+
+edges :: Int -> Int -> GameState -> [(Maybe Col, Int)]
+edges n d gs = edge <$> validMoves (board gs)
+  where edge col = (Just col, snd . minimax n d $ unsafeMove gs col)
+
+scoreGameOutcome :: Int -> GameOutcome -> Int
+scoreGameOutcome _ Draw = 0
+scoreGameOutcome d (Winner White) = 100000 + d
+scoreGameOutcome d (Winner Black) = -100000 - d
+
+evalBoard :: Board -> Int
+evalBoard b = sum . map (evalVector . group) $ vectors b
 
 groups :: (Ord a, Eq a) => Board -> (Loc -> a) -> [[Cell]]
 groups b grouping = map (map (b !)) inds
@@ -184,9 +211,6 @@ vectors b = [diag1, diag2, vert, horiz] >>= groups b
         diag2 (Row r, Col c) = r + c
         vert  (_, Col c) = c
         horiz (Row r, _) = r
-
-evalBoard :: Board -> Int
-evalBoard b = sum . map (evalVector . group) $ vectors b
 
 evalVector :: [[Cell]] -> Int
 evalVector ((Nothing:_):g@(Just c:_):cs) =

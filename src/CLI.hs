@@ -2,9 +2,7 @@ module CLI
 ( GameConfig(..)
 , TextMode(..)
 , parseOpts
-, showBoard
-, showTile
-, parseCol
+, commandLinePlayer
 ) where
 
 import ConnectFour
@@ -131,3 +129,32 @@ parseCol cs [c] = case c `elemIndex` columnNames cs of
   Just i  -> Right . Col $ i + 1
 parseCol _ _ = Left "Enter a single key to indicate\
                        \ the column in which to play."
+
+printGameState :: GameConfig -> GameState -> IO ()
+printGameState opts gs = putStrLn $ showBoard (textMode opts) (board gs) (colCount opts)
+
+getColumnFromPlayer :: GameConfig -> GameState -> IO Col
+getColumnFromPlayer opts gs = do
+  let player = showTile (textMode opts) (Just $ toPlay gs)
+  putStrLn $ player : " to play:"
+  input <- getLine
+  case parseCol (colCount opts) input of
+    Left err -> putStrLn err >> getColumnFromPlayer opts gs
+    Right col -> return col
+
+printMoveInfraction :: MoveInfraction -> IO ()
+printMoveInfraction (ColumnFull _) = putStrLn "Column full!"
+printMoveInfraction (ColumnOutOfRange _) = putStrLn "Column out of range!"
+
+printGameOutcome :: GameOutcome -> IO ()
+printGameOutcome Draw = putStrLn "It's a draw!"
+printGameOutcome (Winner White) = putStrLn "White wins!"
+printGameOutcome (Winner Black) = putStrLn "Black wins!"
+
+commandLinePlayer :: GameConfig -> PlayerIO
+commandLinePlayer opts = PlayerIO {
+  showGameState = printGameState opts,
+  showMoveInfraction = printMoveInfraction,
+  showGameOutcome = printGameOutcome,
+  chooseMove = getColumnFromPlayer opts
+}

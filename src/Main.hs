@@ -2,35 +2,17 @@
 
 import ConnectFour
 import CLI
-import Control.Monad
+import ComputerPlayer
 import qualified Data.Map as M
-
-printGameState :: GameConfig -> GameState -> IO ()
-printGameState opts gs = do
-  let tm = textMode opts
-  putStrLn $ showBoard tm (board gs) (colCount opts)
-  let player = showTile tm (Just $ toPlay gs)
-  putStrLn $ player : " to play:"
-
-getColumnFromPlayer :: GameConfig -> GameState -> IO Col
-getColumnFromPlayer opts gs = do
-  input <- getLine
-  case parseCol (colCount opts) input of
-    Left err -> putStrLn err >> getColumnFromPlayer opts gs
-    Right col -> return col
 
 main :: IO ()
 main = do
   opts <- parseOpts
-  let pio = PlayerIO {
-    showGameState = printGameState opts,
-    showMoveInfraction = void . return,
-    showGameOutcode = void . return,
-    chooseMove = getColumnFromPlayer opts
-  }
+  let clp = commandLinePlayer opts
+  let ai = computerPlayer (connect opts) (aiDepth opts)
   let pmap = M.fromList
-            [ (White, pio)
-            , (Black, pio)
+            [ (White, clp)
+            , (Black, ai)
             ]
   let gio = GameIO {
     playerIO = pmap,
