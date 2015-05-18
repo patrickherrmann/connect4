@@ -1,12 +1,10 @@
 module CLI
 ( GameConfig(..)
 , TextMode(..)
-, optParser
-, showBoardAscii
-, showTileAscii
-, showBoardUnicode
-, showTileUnicode
-, columnNames
+, parseOpts
+, showBoard
+, showTile
+, parseCol
 ) where
 
 import ConnectFour
@@ -16,11 +14,11 @@ import Data.List
 import Data.List.Split
 
 data GameConfig = GameConfig
-  { winLength :: Int
-  , rows :: Int
-  , cols :: Int
+  { connect  :: Int
+  , rowCount :: Int
+  , colCount :: Int
   , textMode :: TextMode
-  , ai :: Int
+  , aiDepth  :: Int
   }
 
 data TextMode
@@ -77,16 +75,19 @@ optParser = info (helper <*> parseGameConfig)
                        \Play connect 4 from a command line interface"
              <> progDesc "Change the connection length and board size"
 
+parseOpts :: IO GameConfig
+parseOpts = execParser optParser
+
 showTileAscii :: Cell -> Char
 showTileAscii Nothing = '.'
 showTileAscii (Just Black) = 'O'
 showTileAscii (Just White) = 'X'
 
-showBoardAscii :: Board -> String
-showBoardAscii b = unlines
+showBoardAscii :: Board -> Int -> String
+showBoardAscii b w = unlines
                  . map (intersperse ' ')
-                 . (++ [columnNames b])
-                 . chunksOf (colCount b)
+                 . (++ [columnNames w])
+                 . chunksOf w
                  . map showTileAscii
                  . elems $ b
 
@@ -99,20 +100,34 @@ format :: [a] -> [a] -> [a] -> [[a]] -> [a]
 format start mid end cells =
     start ++ intercalate mid cells ++ end
 
-showBoardUnicode :: Board -> String
-showBoardUnicode b = allRows ++ colHeader
-  where cols = colCount b
-        rows = chunksOf cols
+showBoardUnicode :: Board -> Int -> String
+showBoardUnicode b w = allRows ++ colHeader
+  where rs = chunksOf w
              . map showTileUnicode
              . elems $ b
-        colHeader = format " " " " " \n" . map pad $ columnNames b
+        colHeader = format " " " " " \n" . map pad $ columnNames w
         topRow = format "╓" "┬" "╖\n" $ perCol "───"
         midRow = format "╟" "┼" "╢\n" $ perCol "───"
         botRow = format "╚" "╧" "╝\n" $ perCol "═══"
         formatRow row = format "║" "│" "║\n" $ map pad row
-        allRows = format topRow midRow botRow $ map formatRow rows
-        perCol = replicate cols
+        allRows = format topRow midRow botRow $ map formatRow rs
+        perCol = replicate w
         pad c = [' ', c, ' ']
 
-columnNames :: Board -> String
-columnNames b = take (colCount b) ['a'..]
+columnNames :: Int -> String
+columnNames w = take w ['a'..]
+
+showTile :: TextMode -> (Cell -> Char)
+showTile Ascii = showTileAscii
+showTile Unicode = showTileUnicode
+
+showBoard :: TextMode -> (Board -> Int -> String)
+showBoard Ascii = showBoardAscii
+showBoard Unicode = showBoardUnicode
+
+parseCol :: Int -> String -> Either String Col
+parseCol cs [c] = case c `elemIndex` columnNames cs of
+  Nothing -> Left $ "No column '" ++ [c] ++ "'"
+  Just i  -> Right . Col $ i + 1
+parseCol _ _ = Left "Enter a single key to indicate\
+                       \ the column in which to play."

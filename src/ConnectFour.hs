@@ -1,20 +1,20 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module ConnectFour
-( Row
-, Col
+( Row(..)
+, Col(..)
 , Loc
 , Cell
 , Board
-, Color(..)
+, Player(..)
 , GameState(..)
 , GameOutcome(..)
-, Move(..)
 , MoveInfraction(..)
 , PlayerIO(..)
 , GameIO(..)
 , opponent
-, bestMove
+, playGame
 ) where
 
 import Data.List
@@ -28,43 +28,42 @@ import Control.Monad.Reader
 newtype Row = Row Int deriving (Eq, Ord, Enum, Ix)
 newtype Col = Col Int deriving (Eq, Ord, Enum, Ix)
 type Loc = (Row, Col)
-type Cell = Maybe Color
-
-data Move = Move Row Col
+type Cell = Maybe Player
 
 type Board = Array Loc Cell
 
-data Color
+data Player
   = Black
   | White
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 data GameState = GameState
   { board :: Board
-  , toPlay :: Color
+  , toPlay :: Player
   }
 
 data GameOutcome
   = Draw
-  | Winner Color
+  | Winner Player
 
 data MoveInfraction
   = ColumnFull Col
+  | ColumnOutOfRange Col
 
 data PlayerIO = PlayerIO
   { showGameState :: GameState -> IO ()
   , showMoveInfraction :: MoveInfraction -> IO ()
   , showGameOutcode :: GameOutcome -> IO ()
-  , chooseMove :: GameState -> IO Move
+  , chooseMove :: GameState -> IO Col
   }
 
-type PMap a = M.Map Color a
+type PMap a = M.Map Player a
 
 data GameIO = GameIO
   { playerIO     :: PMap PlayerIO
-  , winLength    :: Int
-  , boardWidth   :: Col
-  , boardHeight  :: Row
+  , connectN     :: Int
+  , cols         :: Col
+  , rows         :: Row
   }
 
 newtype ConnectFourIO a = ConnectFourIO
@@ -85,63 +84,93 @@ runGameWith gio = flip runReaderT gio . runGame
 
 entireGame :: ConnectFourIO ()
 entireGame = do
+  gs <- initialGameState
+  outcome <- playTurns gs
+  doEachPlayerIO_ showGameOutcode (const outcome)
   return ()
+
+playTurns :: GameState -> ConnectFourIO GameOutcome
+playTurns gs = do
+  outcome <- gameOutcome gs
+  case outcome of
+    Nothing -> playTurn gs >>= playTurns
+    Just go -> return go
+
+playTurn :: GameState -> ConnectFourIO GameState
+playTurn gs = do
+  let p = toPlay gs
+  chosenCol <- doPlayerIO p chooseMove gs
+  case checkMove gs chosenCol of
+    Just mi -> doPlayerIO p showMoveInfraction mi >> playTurn gs
+    Nothing -> return $ unsafeMove gs chosenCol
 
 initialGameState :: ConnectFourIO GameState
 initialGameState = do
-  bw <- asks boardWidth
-  bh <- asks boardHeight
-  let b = createBoard (bh, bw)
+  cs <- asks cols
+  rs <- asks rows
+  let b = createBoard (rs, cs)
   return $ GameState b White
 
-bestMove :: Int -> Color -> Int -> GameState -> Int
-bestMove = undefined
-{-
-bestMove s pro d gs = fst $ minimax s pro d gs
-
-minimax :: Int -> Color -> Int -> GameState -> (Int, Int)
-minimax _ _ _ (GameState _ Draw) = (0, 0)
-minimax _ pro 0 (GameState b _) = (0, sign pro * evalBoard b)
-minimax _ pro d (GameState _ (Winner c)) = (0, score)
-  where score = if pro == c then 100000 + d else -100000 - d
-minimax s pro d gs@(GameState b (Undecided c)) =
-    goal (comparing snd) kids
-  where kids = map tup $ validMoves b
-        tup i = let (_, score) = mm i in (i, score)
-        mm i = minimax s pro (d - 1) (unsafeMove s gs i)
-        goal = if pro == c then maximumBy else minimumBy
--}
-unsafeMove :: Int -> GameState -> Col -> GameState
-unsafeMove s (GameState b c) i = GameState b' (opponent c)
+unsafeMove :: GameState -> Col -> GameState
+unsafeMove (GameState b c) i = GameState b' (opponent c)
   where b' = dropPiece b i c
 
-move :: Int -> GameState -> Col -> Maybe GameState
-move s gs@(GameState b _) i
-  | i `elem` validMoves b = Just $ unsafeMove s gs i
-  | otherwise = Nothing
-
-opponent :: Color -> Color
+opponent :: Player -> Player
 opponent Black = White
 opponent White = Black
 
 createBoard :: (Row, Col) -> Board
 createBoard ub = listArray ((Row 1, Col 1), ub) $ repeat Nothing
 
+checkMove :: GameState -> Col -> Maybe MoveInfraction
+checkMove (board -> b) c
+  | c `notElem` columns b = Just $ ColumnOutOfRange c
+  | columnFull b c = Just $ ColumnFull c
+  | otherwise = Nothing
+
+columns :: Board -> [Col]
+columns b = [x..y]
+  where ((_, x), (_, y)) = bounds b
+
 columnFull :: Board -> Col -> Bool
 columnFull b c = isJust (b ! (Row 1, c))
 
 validMoves :: Board -> [Col]
-validMoves b = filter (not . columnFull b) [(Col 1)..cc]
-  where (_, (_, cc)) = bounds b
+validMoves b = filter (not . columnFull b) $ columns b
 
 setPiece :: Board -> Loc -> Cell -> Board
 setPiece b l c = b // [(l, c)]
 
-dropPiece :: Board -> Col -> Color -> Board
-dropPiece b i color = setPiece b (last open) (Just color)
+dropPiece :: Board -> Col -> Player -> Board
+dropPiece b i p = setPiece b (last open) (Just p)
   where (open, _) = break (isJust . (b !))
                   . filter sameCol $ indices b
         sameCol (_, c) = c == i
+
+gameOutcome :: GameState -> ConnectFourIO (Maybe GameOutcome)
+gameOutcome gs = do
+  n <- asks connectN
+  return $ gameOutcome' n gs
+
+gameOutcome' :: Int -> GameState -> Maybe GameOutcome
+gameOutcome' n gs
+    | any checkLine $ vectors b = Just $ Winner (opponent $ toPlay gs)
+    | null $ validMoves b = Just Draw
+    | otherwise = Nothing
+  where checkLine = any checkGroup . group
+        checkGroup g = isJust (head g) && length g >= n
+        b = board gs
+
+doPlayerIO :: Player -> (PlayerIO -> a -> IO b) -> a -> ConnectFourIO b
+doPlayerIO p f a = do
+  pio <- (M.! p) <$> asks playerIO
+  liftIO $ f pio a
+
+doEachPlayerIO_ :: (PlayerIO -> a -> IO b) -> (Player -> a) -> ConnectFourIO ()
+doEachPlayerIO_ f fa = do
+  pios <- M.assocs <$> asks playerIO
+  let res (p, pio) = f pio (fa p)
+  liftIO $ mapM_ res pios
 
 groups :: (Ord a, Eq a) => Board -> (Loc -> a) -> [[Cell]]
 groups b grouping = map (map (b !)) inds
@@ -151,10 +180,10 @@ groups b grouping = map (map (b !)) inds
 
 vectors :: Board -> [[Cell]]
 vectors b = [diag1, diag2, vert, horiz] >>= groups b
-  where diag1 (r, c) = r - c
-        diag2 (r, c) = r + c
-        vert  (_, c) = c
-        horiz (r, _) = r
+  where diag1 (Row r, Col c) = r - c
+        diag2 (Row r, Col c) = r + c
+        vert  (_, Col c) = c
+        horiz (Row r, _) = r
 
 evalBoard :: Board -> Int
 evalBoard b = sum . map (evalVector . group) $ vectors b
@@ -170,15 +199,6 @@ evalVector _ = 0
 evalGroup :: [Cell] -> Int
 evalGroup cs = 4 ^ (length cs - 1)
 
-sign :: Color -> Int
+sign :: Player -> Int
 sign Black = -1
 sign White = 1
-
-gameOver :: GameState -> Int -> Maybe GameOutcome
-gameOver gs streak
-    | any checkLine $ vectors b = Just $ Winner (opponent $ toPlay gs)
-    | null $ validMoves b = Just Draw
-    | otherwise = Nothing
-  where checkLine = any checkGroup . group
-        checkGroup g = isJust (head g) && length g >= streak
-        b = board gs
