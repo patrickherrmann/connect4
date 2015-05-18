@@ -13,16 +13,10 @@ module ConnectFour
 , rowCount
 , move
 , gameOver
-, showBoardAscii
-, showTileAscii
-, showBoardUnicode
-, showTileUnicode
-, columnNames
 , bestMove
 ) where
 
 import Data.List
-import Data.List.Split (chunksOf)
 import Data.Array.IArray
 import Data.Maybe
 import Data.Function
@@ -144,43 +138,3 @@ gameOver :: Board -> Int -> Bool
 gameOver b streak = any checkLine $ vectors b
   where checkLine = any checkGroup . group
         checkGroup g = isJust (head g) && length g >= streak
-
-showTileAscii :: Cell -> Char
-showTileAscii Nothing = '.'
-showTileAscii (Just Black) = 'O'
-showTileAscii (Just White) = 'X'
-
-showBoardAscii :: Board -> String
-showBoardAscii b = unlines
-                 . map (intersperse ' ')
-                 . (++ [columnNames b])
-                 . chunksOf (colCount b)
-                 . map showTileAscii
-                 . elems $ b
-
-showTileUnicode :: Cell -> Char
-showTileUnicode Nothing = ' '
-showTileUnicode (Just Black) = '○'
-showTileUnicode (Just White) = '●'
-
-format :: [a] -> [a] -> [a] -> [[a]] -> [a]
-format start mid end cells =
-    start ++ intercalate mid cells ++ end
-
-showBoardUnicode :: Board -> String
-showBoardUnicode b = allRows ++ colHeader
-  where cols = colCount b
-        rows = chunksOf cols
-             . map showTileUnicode
-             . elems $ b
-        colHeader = format " " " " " \n" . map pad $ columnNames b
-        topRow = format "╓" "┬" "╖\n" $ perCol "───"
-        midRow = format "╟" "┼" "╢\n" $ perCol "───"
-        botRow = format "╚" "╧" "╝\n" $ perCol "═══"
-        formatRow row = format "║" "│" "║\n" $ map pad row
-        allRows = format topRow midRow botRow $ map formatRow rows
-        perCol = replicate cols
-        pad c = [' ', c, ' ']
-
-columnNames :: Board -> String
-columnNames b = take (colCount b) ['a'..]

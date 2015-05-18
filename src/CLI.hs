@@ -1,11 +1,19 @@
 module CLI
 ( GameConfig(..)
 , TextMode(..)
-, parseGameConfig
 , optParser
+, showBoardAscii
+, showTileAscii
+, showBoardUnicode
+, showTileUnicode
+, columnNames
 ) where
 
+import ConnectFour
 import Options.Applicative
+import Data.Array
+import Data.List
+import Data.List.Split
 
 data GameConfig = GameConfig
   { winLength :: Int
@@ -68,3 +76,43 @@ optParser = info (helper <*> parseGameConfig)
              <> header "connect4 - \
                        \Play connect 4 from a command line interface"
              <> progDesc "Change the connection length and board size"
+
+showTileAscii :: Cell -> Char
+showTileAscii Nothing = '.'
+showTileAscii (Just Black) = 'O'
+showTileAscii (Just White) = 'X'
+
+showBoardAscii :: Board -> String
+showBoardAscii b = unlines
+                 . map (intersperse ' ')
+                 . (++ [columnNames b])
+                 . chunksOf (colCount b)
+                 . map showTileAscii
+                 . elems $ b
+
+showTileUnicode :: Cell -> Char
+showTileUnicode Nothing = ' '
+showTileUnicode (Just Black) = '○'
+showTileUnicode (Just White) = '●'
+
+format :: [a] -> [a] -> [a] -> [[a]] -> [a]
+format start mid end cells =
+    start ++ intercalate mid cells ++ end
+
+showBoardUnicode :: Board -> String
+showBoardUnicode b = allRows ++ colHeader
+  where cols = colCount b
+        rows = chunksOf cols
+             . map showTileUnicode
+             . elems $ b
+        colHeader = format " " " " " \n" . map pad $ columnNames b
+        topRow = format "╓" "┬" "╖\n" $ perCol "───"
+        midRow = format "╟" "┼" "╢\n" $ perCol "───"
+        botRow = format "╚" "╧" "╝\n" $ perCol "═══"
+        formatRow row = format "║" "│" "║\n" $ map pad row
+        allRows = format topRow midRow botRow $ map formatRow rows
+        perCol = replicate cols
+        pad c = [' ', c, ' ']
+
+columnNames :: Board -> String
+columnNames b = take (colCount b) ['a'..]
