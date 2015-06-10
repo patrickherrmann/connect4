@@ -25,6 +25,7 @@ import Data.Function
 import Data.Ord
 import qualified Data.Map as M
 import Control.Monad.Reader
+import Control.Applicative
 
 newtype Row = Row Int deriving (Eq, Ord, Enum, Ix)
 newtype Col = Col Int deriving (Eq, Ord, Enum, Ix)

@@ -1,0 +1,6 @@
+flags:
+  connect4: {}
+packages:
+- '.'
+extra-deps: []
+resolver: lts-2.13

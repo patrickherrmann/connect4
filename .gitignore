@@ -13,6 +13,8 @@ cabal.config
 *.prof
 *.hp
 *.aux
+.stack-work
+dist-stack
 
 # Executables
 connect4
