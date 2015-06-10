@@ -1,15 +1,13 @@
-Build with cabal:
+Build with [stack](https://github.com/commercialhaskell/stack):
 
 ```
-$ cabal sandbox init
-$ cabal install --only-dependencies
-$ cabal build
+$ stack build
 ```
 
 Run with options:
 
 ```
-$ ./dist/build/connect4/connect4 --help
+$ stack exec -- connect4 --help
 connect4 - Play connect 4 from a command line interface
 
 Usage: connect4 [--connect N] [-r|--rows ROWS] [-c|--cols COLS] [--ascii]
