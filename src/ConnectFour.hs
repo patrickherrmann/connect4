@@ -1,6 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ViewPatterns #-}
-
 module ConnectFour
 ( Row(..)
 , Col(..)
@@ -25,7 +22,6 @@ import Data.Function
 import Data.Ord
 import qualified Data.Map as M
 import Control.Monad.Reader
-import Control.Applicative
 
 newtype Row = Row Int deriving (Eq, Ord, Enum, Ix)
 newtype Col = Col Int deriving (Eq, Ord, Enum, Ix)
@@ -53,10 +49,10 @@ data MoveInfraction
   | ColumnOutOfRange Col
 
 data PlayerIO = PlayerIO
-  { showGameState :: GameState -> IO ()
+  { showGameState      :: GameState -> IO ()
   , showMoveInfraction :: MoveInfraction -> IO ()
-  , showGameOutcome :: GameOutcome -> IO ()
-  , chooseMove :: GameState -> IO Col
+  , showGameOutcome    :: GameOutcome -> IO ()
+  , chooseMove         :: GameState -> IO Col
   }
 
 type PMap a = M.Map Player a
@@ -93,9 +89,7 @@ entireGame = do
   return ()
 
 playTurns :: GameState -> ConnectFourIO GameOutcome
-playTurns gs = do
-  outcome <- gameOutcome gs
-  case outcome of
+playTurns gs = gameOutcome gs >>= \case
     Nothing -> playTurn gs >>= playTurns
     Just go -> return go
 
@@ -119,11 +113,13 @@ initialGameState = do
 
 unsafeMove :: GameState -> Col -> GameState
 unsafeMove (GameState b c) i = GameState b' (opponent c)
-  where b' = dropPiece b i c
+  where
+    b' = dropPiece b i c
 
 opponent :: Player -> Player
-opponent Black = White
-opponent White = Black
+opponent = \case
+  Black -> White
+  White -> Black
 
 createBoard :: (Row, Col) -> Board
 createBoard ub = listArray ((Row 1, Col 1), ub) $ repeat Nothing
@@ -136,7 +132,8 @@ checkMove (board -> b) c
 
 columns :: Board -> [Col]
 columns b = [x..y]
-  where ((_, x), (_, y)) = bounds b
+  where
+    ((_, x), (_, y)) = bounds b
 
 columnFull :: Board -> Col -> Bool
 columnFull b c = isJust (b ! (Row 1, c))
@@ -149,9 +146,9 @@ setPiece b l c = b // [(l, c)]
 
 dropPiece :: Board -> Col -> Player -> Board
 dropPiece b i p = setPiece b (last open) (Just p)
-  where (open, _) = break (isJust . (b !))
-                  . filter sameCol $ indices b
-        sameCol (_, c) = c == i
+  where
+    (open, _) = break (isJust . (b !)) . filter sameCol $ indices b
+    sameCol (_, c) = c == i
 
 gameOutcome :: GameState -> ConnectFourIO (Maybe GameOutcome)
 gameOutcome gs = do
@@ -163,9 +160,10 @@ gameOutcome' n gs
     | any checkLine $ vectors b = Just $ Winner (opponent $ toPlay gs)
     | null $ validMoves b = Just Draw
     | otherwise = Nothing
-  where checkLine = any checkGroup . group
-        checkGroup g = isJust (head g) && length g >= n
-        b = board gs
+  where
+    checkLine = any checkGroup . group
+    checkGroup g = isJust (head g) && length g >= n
+    b = board gs
 
 doPlayerIO :: Player -> (PlayerIO -> a -> IO b) -> a -> ConnectFourIO b
 doPlayerIO p f a = do
@@ -185,45 +183,50 @@ minimax :: Int -> Int -> GameState -> (Maybe Col, Int)
 minimax n d (gameOutcome' n -> Just go) = (Nothing, scoreGameOutcome d go)
 minimax _ 0 (board -> b) = (Nothing, evalBoard b)
 minimax n d gs = bestBy (toPlay gs) (comparing snd) (edges n (d - 1) gs)
-  where bestBy White = maximumBy
-        bestBy Black = minimumBy
+  where
+    bestBy White = maximumBy
+    bestBy Black = minimumBy
 
 edges :: Int -> Int -> GameState -> [(Maybe Col, Int)]
 edges n d gs = edge <$> validMoves (board gs)
-  where edge col = (Just col, snd . minimax n d $ unsafeMove gs col)
+  where
+    edge col = (Just col, snd . minimax n d $ unsafeMove gs col)
 
 scoreGameOutcome :: Int -> GameOutcome -> Int
-scoreGameOutcome _ Draw = 0
-scoreGameOutcome d (Winner White) = 100000 + d
-scoreGameOutcome d (Winner Black) = -100000 - d
+scoreGameOutcome d = \case
+  Draw -> 0
+  Winner White -> 100000 + d
+  Winner Black -> -100000 - d
 
 evalBoard :: Board -> Int
 evalBoard b = sum . map (evalVector . group) $ vectors b
 
 groups :: (Ord a, Eq a) => Board -> (Loc -> a) -> [[Cell]]
 groups b grouping = map (map (b !)) inds
-  where inds = groupBy ((==) `on` grouping)
-             . sortBy (comparing grouping)
-             $ indices b
+  where
+    inds = groupBy ((==) `on` grouping)
+         . sortBy (comparing grouping)
+         $ indices b
 
 vectors :: Board -> [[Cell]]
 vectors b = [diag1, diag2, vert, horiz] >>= groups b
-  where diag1 (Row r, Col c) = r - c
-        diag2 (Row r, Col c) = r + c
-        vert  (_, Col c) = c
-        horiz (Row r, _) = r
+  where
+    diag1 (Row r, Col c) = r - c
+    diag2 (Row r, Col c) = r + c
+    vert  (_, Col c) = c
+    horiz (Row r, _) = r
 
 evalVector :: [[Cell]] -> Int
-evalVector ((Nothing:_):g@(Just c:_):cs) =
-  evalGroup g * sign c + evalVector (g:cs)
-evalVector (g@(Just c:_):n@(Nothing:_):cs) =
-  evalGroup g * sign c + evalVector (n:cs)
-evalVector (_:cs) = evalVector cs
-evalVector _ = 0
+evalVector = \case
+  (Nothing:_):g@(Just c:_):cs -> evalGroup g * sign c + evalVector (g:cs)
+  g@(Just c:_):n@(Nothing:_):cs -> evalGroup g * sign c + evalVector (n:cs)
+  _:cs -> evalVector cs
+  _ -> 0
 
 evalGroup :: [Cell] -> Int
 evalGroup cs = 4 ^ (length cs - 1)
 
 sign :: Player -> Int
-sign Black = -1
-sign White = 1
+sign = \case
+  Black -> -1
+  White -> 1
