@@ -76,10 +76,12 @@ parseOpts :: IO GameConfig
 parseOpts = customExecParser (prefs showHelpOnError) optParser
 
 showTileAscii :: Cell -> Char
-showTileAscii = \case
-  Nothing -> '.'
-  Just Black -> 'O'
-  Just White -> 'X'
+showTileAscii = maybe '.' showPlayerAscii
+
+showPlayerAscii :: Player -> Char
+showPlayerAscii = \case
+  Black -> 'O'
+  White -> 'X'
 
 showBoardAscii :: Board -> Int -> String
 showBoardAscii b w = unlines
@@ -90,10 +92,12 @@ showBoardAscii b w = unlines
   . elems $ b
 
 showTileUnicode :: Cell -> Char
-showTileUnicode = \case
-  Nothing -> ' '
-  Just Black -> '○'
-  Just White -> '●'
+showTileUnicode = maybe ' ' showPlayerUnicode
+
+showPlayerUnicode :: Player -> Char
+showPlayerUnicode = \case
+  Black -> '○'
+  White -> '●'
 
 format :: [a] -> [a] -> [a] -> [[a]] -> [a]
 format start mid end cells =
@@ -127,6 +131,11 @@ showBoard = \case
   Ascii   -> showBoardAscii
   Unicode -> showBoardUnicode
 
+showPlayer :: TextMode -> (Player -> Char)
+showPlayer = \case
+  Ascii   -> showPlayerAscii
+  Unicode -> showPlayerUnicode
+
 parseCol :: Int -> String -> Either String Col
 parseCol cs [c] = case c `elemIndex` columnNames cs of
   Nothing -> Left $ "No column '" ++ [c] ++ "'"
@@ -139,7 +148,7 @@ printGameState opts gs = putStrLn
 
 getColumnFromPlayer :: GameConfig -> GameState -> IO Col
 getColumnFromPlayer opts gs = do
-  let player = showTile (textMode opts) (Just $ toPlay gs)
+  let player = showPlayer (textMode opts) (toPlay gs)
   putStrLn $ player : " to play:"
   input <- getLine
   case parseCol (colCount opts) input of
@@ -151,16 +160,15 @@ printMoveInfraction = \case
   ColumnFull _ -> putStrLn "Column full!"
   ColumnOutOfRange _ -> putStrLn "Column out of range!"
 
-printGameOutcome :: GameOutcome -> IO ()
-printGameOutcome = \case
+printGameOutcome :: GameConfig -> GameOutcome -> IO ()
+printGameOutcome (textMode -> mode) = \case
   Draw -> putStrLn "It's a draw!"
-  Winner White -> putStrLn "White wins!"
-  Winner Black -> putStrLn "Black wins!"
+  Winner p -> putStrLn $ showPlayer mode p : " wins!"
 
 commandLinePlayer :: GameConfig -> PlayerIO
 commandLinePlayer opts = PlayerIO
   { showGameState = printGameState opts
   , showMoveInfraction = printMoveInfraction
-  , showGameOutcome = printGameOutcome
+  , showGameOutcome = printGameOutcome opts
   , chooseMove = getColumnFromPlayer opts
   }
