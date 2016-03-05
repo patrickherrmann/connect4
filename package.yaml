@@ -1,0 +1,35 @@
+name: connect4
+version: 1.0.0
+synopsis: Play connect 4 from a command line interface
+description: A simple connect 4 interface with extensible game properties
+author: Patrick Herrmann
+maintainer: patrickwherrmann@gmail.com
+copyright: 2016 Patrick Herrmann
+license: MIT
+category: Game
+
+github: patrickherrmann/connect4
+
+ghc-options: -Wall -O2
+default-extensions:
+  - LambdaCase
+  - GeneralizedNewtypeDeriving
+  - ViewPatterns
+dependencies:
+  - base == 4.*
+  - array
+  - containers
+
+library:
+  source-dirs: src
+  dependencies:
+    - mtl
+
+executables:
+  connect4:
+    source-dirs: cli
+    main: Main.hs
+    dependencies:
+      - connect4
+      - optparse-applicative
+      - split
