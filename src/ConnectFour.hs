@@ -90,8 +90,8 @@ entireGame = do
 
 playTurns :: GameState -> ConnectFourIO GameOutcome
 playTurns gs = gameOutcome gs >>= \case
-    Nothing -> playTurn gs >>= playTurns
-    Just go -> return go
+  Nothing -> playTurn gs >>= playTurns
+  Just go -> return go
 
 playTurn :: GameState -> ConnectFourIO GameState
 playTurn gs = do

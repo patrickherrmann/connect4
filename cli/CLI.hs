@@ -121,11 +121,6 @@ showBoardUnicode b w = allRows ++ colHeader
 columnNames :: Int -> String
 columnNames w = take w ['a'..]
 
-showTile :: TextMode -> (Cell -> Char)
-showTile = \case
-  Ascii   -> showTileAscii
-  Unicode -> showTileUnicode
-
 showBoard :: TextMode -> (Board -> Int -> String)
 showBoard = \case
   Ascii   -> showBoardAscii
